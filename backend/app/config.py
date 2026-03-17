@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     scheduler_hour: int = 8
     scheduler_minute: int = 0
 
+    # Allowed frontend origin for CORS (set to your frontend URL in production/Docker)
+    frontend_origin: str = "http://localhost:5173"
+
     # AI provider: "auto" tries local first then falls back to Claude
     # "claude" forces Claude, "local" forces local (LM Studio / Ollama)
     ai_provider: str = "auto"

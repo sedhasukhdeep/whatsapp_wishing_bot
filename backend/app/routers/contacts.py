@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
@@ -23,7 +24,14 @@ def list_contacts(search: str = "", relationship: str = "", db: Session = Depend
 def create_contact(body: ContactCreate, db: Session = Depends(get_db)):
     contact = Contact(**body.model_dump())
     db.add(contact)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"A contact with phone {body.phone} already exists",
+        )
     db.refresh(contact)
     return contact
 
@@ -48,7 +56,14 @@ def update_contact(contact_id: int, body: ContactUpdate, db: Session = Depends(g
         raise HTTPException(status_code=404, detail="Contact not found")
     for field, value in body.model_dump().items():
         setattr(contact, field, value)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"A contact with phone {body.phone} already exists",
+        )
     db.refresh(contact)
     return contact
 

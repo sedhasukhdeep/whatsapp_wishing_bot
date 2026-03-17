@@ -32,21 +32,43 @@ cd frontend
 npm install
 ```
 
-### Running the app
+### Running the app (local dev)
 
+```bash
+# One command — starts backend, bridge, and frontend
+./start.sh
+```
+
+Or manually:
 ```bash
 # Terminal 1 — backend
 cd backend && source .venv/bin/activate
-uvicorn app.main:app --reload
+alembic upgrade head
+uvicorn app.main:app --reload --reload-dir app
 
 # Terminal 2 — WhatsApp bridge
 cd whatsapp-bridge && npm start
 
-# Terminal 3 — frontend
+# Terminal 3 — frontend (needs frontend/.env with VITE_API_URL=http://localhost:8000)
 cd frontend && npm run dev
 ```
 
-Open http://localhost:5173. Go to **WhatsApp Targets** first and scan the QR code.
+Open http://localhost:5173. Go to **WhatsApp** in the sidebar and scan the QR code.
+
+### Running with Docker
+
+```bash
+# 1. Create root .env from template
+cp .env.example .env     # fill in ANTHROPIC_API_KEY
+
+# 2. Build and start all containers
+docker-compose up --build
+
+# 3. Run migrations (first time only)
+docker-compose exec backend alembic upgrade head
+```
+
+Open http://localhost. See `docker-run.md` for individual `docker run` commands.
 
 ### Useful commands
 
@@ -90,7 +112,7 @@ Node.js + whatsapp-web.js singleton in `src/client.js`. Uses `LocalAuth` — ses
 - `GET /status` → `{ ready, qr_image }`
 - `POST /send` → `{ chat_id, message }` → sends via WhatsApp Web
 
-Bridge listens on `127.0.0.1:3001` only (not exposed publicly).
+Bridge listens on `127.0.0.1:3001` locally (via `HOST` env var; `0.0.0.0` in Docker for inter-container communication). Never exposed on a public port.
 
 ### Frontend (`frontend/src/`)
 
@@ -111,6 +133,19 @@ SQLite at `backend/wishing_bot.db`. Key constraint: `(occasion_id, occasion_date
 |---|---|
 | `ANTHROPIC_API_KEY` | Claude API key |
 | `WA_BRIDGE_URL` | URL of Node bridge (default: `http://localhost:3001`) |
+| `FRONTEND_ORIGIN` | Allowed CORS origin (default: `http://localhost:5173`; set to `http://localhost` in Docker) |
 | `SCHEDULER_TIMEZONE` | Cron timezone (default: `Asia/Kolkata`) |
 | `SCHEDULER_HOUR` | Hour for daily draft generation (default: `8`) |
-| `DB_URL` | SQLAlchemy DB URL (default: SQLite) |
+| `DB_URL` | SQLAlchemy DB URL (default: SQLite at `./wishing_bot.db`; Docker uses `/app/data/wishing_bot.db`) |
+| `AI_PROVIDER` | `auto` / `claude` / `local` (default: `auto`) |
+| `LOCAL_AI_URL` | LM Studio / Ollama base URL (default: `http://localhost:1234/v1`) |
+
+### Frontend env (frontend/.env — dev only, gitignored)
+
+| Variable | Purpose |
+|---|---|
+| `VITE_API_URL` | Backend URL — set to `http://localhost:8000` for dev; empty in Docker (nginx proxies) |
+
+### Docker networking
+
+In Docker Compose, nginx proxies all `/api/*` requests to the `backend` container — no CORS issues and no hardcoded port in the frontend. The WA bridge is internal-only (no published port).

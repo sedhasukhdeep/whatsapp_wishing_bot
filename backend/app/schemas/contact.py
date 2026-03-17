@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.schemas.occasion import OccasionOut
 
@@ -21,6 +21,29 @@ class ContactBase(BaseModel):
     custom_instructions: str | None = None
     whatsapp_chat_id: str | None = None
     whatsapp_chat_name: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Name cannot be empty")
+        if len(v) > 200:
+            raise ValueError("Name must be 200 characters or less")
+        return v
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        v = v.strip()
+        if not v.startswith("+"):
+            raise ValueError("Phone must be in international format starting with + (e.g. +919876543210)")
+        digits = v[1:].replace(" ", "").replace("-", "")
+        if not digits.isdigit():
+            raise ValueError("Phone number must contain only digits after the + sign")
+        if not (7 <= len(digits) <= 15):
+            raise ValueError("Phone number must be between 7 and 15 digits")
+        return v
 
 
 class ContactCreate(ContactBase):

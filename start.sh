@@ -28,10 +28,18 @@ trap cleanup EXIT INT TERM
 [[ -d "$ROOT/whatsapp-bridge/node_modules" ]] || die "Bridge deps missing. Run: cd whatsapp-bridge && npm install"
 [[ -d "$ROOT/frontend/node_modules" ]] || die "Frontend deps missing. Run: cd frontend && npm install"
 
+# Auto-create frontend/.env if missing (needed for VITE_API_URL in dev)
+if [[ ! -f "$ROOT/frontend/.env" ]]; then
+  cp "$ROOT/frontend/.env.example" "$ROOT/frontend/.env"
+  warn "Created frontend/.env from .env.example (VITE_API_URL=http://localhost:8000)"
+fi
+
 # ── backend ───────────────────────────────────────────────────────────────────
 log "Starting backend (port 8000)..."
 source "$ROOT/backend/.venv/bin/activate"
 cd "$ROOT/backend"
+log "Running database migrations..."
+alembic upgrade head
 uvicorn app.main:app --reload --reload-dir app --port 8000 &
 PIDS+=($!)
 

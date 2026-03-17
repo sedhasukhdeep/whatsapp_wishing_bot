@@ -1,3 +1,6 @@
+const WA_WARN = 3800;
+const WA_LIMIT = 4096;
+
 interface Props {
   value: string;
   onChange: (v: string) => void;
@@ -6,6 +9,12 @@ interface Props {
 }
 
 export default function MessageEditor({ value, onChange, onRegenerate, regenerating }: Props) {
+  const len = value.length;
+  const overLimit = len > WA_LIMIT;
+  const nearLimit = len > WA_WARN;
+
+  const counterColor = overLimit ? '#dc2626' : nearLimit ? '#d97706' : '#9ca3af';
+
   return (
     <div style={{ marginBottom: 12 }}>
       <textarea
@@ -14,18 +23,25 @@ export default function MessageEditor({ value, onChange, onRegenerate, regenerat
         rows={5}
         style={{
           width: '100%', boxSizing: 'border-box', padding: '10px 12px',
-          border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14,
+          border: `1px solid ${overLimit ? '#fca5a5' : '#d1d5db'}`,
+          borderRadius: 6, fontSize: 14,
           lineHeight: 1.5, resize: 'vertical', fontFamily: 'inherit',
+          outline: overLimit ? '2px solid #fca5a5' : undefined,
         }}
       />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-        <span style={{ fontSize: 12, color: '#9ca3af' }}>{value.length} chars</span>
+        <span style={{ fontSize: 12, color: counterColor }}>
+          {len} / {WA_LIMIT} chars
+          {overLimit && ' — message exceeds WhatsApp limit'}
+          {!overLimit && nearLimit && ' — approaching WhatsApp limit'}
+        </span>
         <button
           onClick={onRegenerate}
           disabled={regenerating}
           style={{
             fontSize: 12, padding: '4px 10px', borderRadius: 4,
-            border: '1px solid #d1d5db', background: '#fff', cursor: regenerating ? 'not-allowed' : 'pointer',
+            border: '1px solid #d1d5db', background: '#fff',
+            cursor: regenerating ? 'not-allowed' : 'pointer',
             color: '#6b7280',
           }}
         >

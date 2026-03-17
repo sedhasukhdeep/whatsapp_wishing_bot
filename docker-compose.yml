@@ -1,0 +1,40 @@
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    volumes:
+      - db_data:/app/data
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DB_URL=sqlite:////app/data/wishing_bot.db
+      - WA_BRIDGE_URL=http://wa-bridge:3001
+      - FRONTEND_ORIGIN=http://localhost
+      - SCHEDULER_TIMEZONE=${SCHEDULER_TIMEZONE:-Asia/Kolkata}
+      - SCHEDULER_HOUR=${SCHEDULER_HOUR:-8}
+      - SCHEDULER_MINUTE=${SCHEDULER_MINUTE:-0}
+      - AI_PROVIDER=${AI_PROVIDER:-claude}
+    depends_on:
+      - wa-bridge
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  wa-bridge:
+    build: ./whatsapp-bridge
+    restart: unless-stopped
+    volumes:
+      - wa_session:/app/session
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
+  wa_session:

@@ -13,7 +13,27 @@ import type {
   WhatsAppTarget,
 } from '../types';
 
-const api = axios.create({ baseURL: 'http://localhost:8000' });
+const api = axios.create({
+  // Dev: set VITE_API_URL=http://localhost:8000 in frontend/.env
+  // Docker: leave unset — nginx proxies /api/* to backend container
+  baseURL: import.meta.env.VITE_API_URL || '',
+  timeout: 30000,
+});
+
+// Normalize error messages from FastAPI validation errors and plain strings
+api.interceptors.response.use(
+  (r) => r,
+  (err) => {
+    const detail = err?.response?.data?.detail;
+    if (typeof detail === 'string') {
+      err.message = detail;
+    } else if (Array.isArray(detail)) {
+      // Pydantic validation errors: [{loc, msg, type}, ...]
+      err.message = detail.map((d: { msg: string }) => d.msg).join('; ');
+    }
+    return Promise.reject(err);
+  }
+);
 
 // Contacts
 export const listContacts = (search = '', relationship = '') =>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { approveDraft, regenerateDraft, sendDraft, skipDraft } from '../../api/client';
 import type { DashboardOccasionItem, MessageDraft, WhatsAppTarget } from '../../types';
+import ConfirmDialog from '../shared/ConfirmDialog';
 import StatusBadge from '../shared/StatusBadge';
 import MessageEditor from './MessageEditor';
 
@@ -26,33 +27,47 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
   const [selectedTarget, setSelectedTarget] = useState<number | ''>('');
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [confirmRegen, setConfirmRegen] = useState(false);
 
-  // If the contact has a linked WhatsApp chat, we can send directly without picking a target
   const linkedChat = contact.whatsapp_chat_id;
   const linkedChatName = contact.whatsapp_chat_name || contact.whatsapp_chat_id;
   const canSendDirectly = !!linkedChat;
   const canSendViaTarget = selectedTarget !== '';
-  const canSend = canSendDirectly || canSendViaTarget;
+  const hasEdits = text !== (draft?.generated_text ?? '');
 
   const currentDraft = draft;
 
-  async function handle(action: () => Promise<MessageDraft>) {
+  async function handle(action: () => Promise<MessageDraft>, successMsg?: string) {
     setError('');
+    setSuccess('');
     try {
       const updated = await action();
       onUpdate(updated);
+      if (successMsg) {
+        setSuccess(successMsg);
+        setTimeout(() => setSuccess(''), 3000);
+      }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'An error occurred';
-      setError(msg);
+      setError(e instanceof Error ? e.message : 'An error occurred');
     } finally {
       setLoading(null);
     }
   }
 
+  function doRegen() {
+    setLoading('regen');
+    handle(async () => {
+      const d = await regenerateDraft(currentDraft!.id);
+      setText(d.generated_text);
+      return d;
+    });
+  }
+
   function handleSend() {
     setLoading('send');
     const targetId = canSendDirectly ? null : (selectedTarget as number);
-    handle(() => sendDraft(currentDraft!.id, targetId));
+    handle(() => sendDraft(currentDraft!.id, targetId), 'Message sent!');
   }
 
   return (
@@ -74,13 +89,12 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
           <MessageEditor
             value={text}
             onChange={setText}
-            onRegenerate={async () => {
-              setLoading('regen');
-              await handle(async () => {
-                const d = await regenerateDraft(currentDraft.id);
-                setText(d.generated_text);
-                return d;
-              });
+            onRegenerate={() => {
+              if (hasEdits) {
+                setConfirmRegen(true);
+              } else {
+                doRegen();
+              }
             }}
             regenerating={loading === 'regen'}
           />
@@ -93,20 +107,22 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
                   disabled={!!loading}
                   onClick={() => {
                     setLoading('approve');
-                    handle(() => approveDraft(currentDraft.id, text !== currentDraft.generated_text ? text : undefined));
+                    handle(
+                      () => approveDraft(currentDraft.id, text !== currentDraft.generated_text ? text : undefined),
+                      'Approved!'
+                    );
                   }}
                 >
                   {loading === 'approve' ? '...' : 'Approve'}
                 </button>
 
-                {/* Send section */}
                 {canSendDirectly ? (
                   <button
                     style={{ ...btnGreen, opacity: currentDraft.status === 'approved' ? 1 : 0.5 }}
                     disabled={currentDraft.status !== 'approved' || !!loading}
                     onClick={handleSend}
                   >
-                    {loading === 'send' ? '...' : `Send to ${linkedChatName}`}
+                    {loading === 'send' ? 'Sending...' : `Send to ${linkedChatName}`}
                   </button>
                 ) : (
                   <>
@@ -123,7 +139,7 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
                       disabled={currentDraft.status !== 'approved' || !canSendViaTarget || !!loading}
                       onClick={handleSend}
                     >
-                      {loading === 'send' ? '...' : 'Send'}
+                      {loading === 'send' ? 'Sending...' : 'Send'}
                     </button>
                   </>
                 )}
@@ -139,7 +155,7 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
 
               {!canSendDirectly && targets.length === 0 && (
                 <p style={{ margin: '8px 0 0', fontSize: 12, color: '#9ca3af' }}>
-                  Tip: Link a WhatsApp chat to this contact's profile to send with one click.
+                  Tip: Link a WhatsApp chat on the contact's profile for one-click sending.
                 </p>
               )}
             </div>
@@ -152,6 +168,15 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
       )}
 
       {error && <div style={{ marginTop: 8, fontSize: 13, color: '#ef4444' }}>{error}</div>}
+      {success && <div style={{ marginTop: 8, fontSize: 13, color: '#059669', fontWeight: 500 }}>{success}</div>}
+
+      {confirmRegen && (
+        <ConfirmDialog
+          message="Your edits will be lost. Regenerate the message anyway?"
+          onConfirm={() => { setConfirmRegen(false); doRegen(); }}
+          onCancel={() => setConfirmRegen(false)}
+        />
+      )}
     </div>
   );
 }

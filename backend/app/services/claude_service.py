@@ -94,7 +94,7 @@ async def _generate_local(prompt: str, model: str) -> str:
 
 
 async def _generate_claude(prompt: str) -> str:
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key, timeout=30.0)
     response = await client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=300,
