@@ -26,6 +26,10 @@ whatsapp-bridge/session/
 whatsapp-bridge/.wwebjs_cache/
 whatsapp-bridge/.wwebjs_auth/
 
+# Test artifacts
+frontend/playwright-report/
+frontend/test-results/
+
 # Logs
 *.log
 logs/
