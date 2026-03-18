@@ -114,11 +114,15 @@ Open **Settings** in the sidebar to configure:
 
 ### AI provider
 
-- **Auto** — tries local LLM first, falls back to Claude
-- **Claude only** — uses Anthropic API (requires `ANTHROPIC_API_KEY`)
-- **Local only** — uses LM Studio or Ollama (OpenAI-compatible endpoint)
+| Provider | Description | Key required |
+|---|---|---|
+| **Auto** | Tries local LLM first, falls back to Claude | Anthropic key |
+| **Claude** | Anthropic Claude models (Haiku, Sonnet, Opus) | `ANTHROPIC_API_KEY` |
+| **OpenAI** | GPT-4o, GPT-4.1, o4-mini, etc. | OpenAI API key |
+| **Gemini** | Google Gemini 2.0/2.5 Flash & Pro | Gemini API key |
+| **Local** | LM Studio or Ollama (OpenAI-compatible) | None |
 
-You can set the Anthropic API key, Claude model, and local AI URL/model from the UI — no need to restart after changing.
+All provider keys and model selections are configurable from the Settings UI — no restart needed. Keys are stored in the database and never sent to the browser.
 
 ### Giphy
 
@@ -182,7 +186,11 @@ open http://localhost:8000/docs
 | `SCHEDULER_HOUR` | `8` | Hour for daily run |
 | `SCHEDULER_MINUTE` | `0` | Minute for daily run |
 | `DB_URL` | `sqlite:///./wishing_bot.db` | SQLAlchemy database URL |
-| `AI_PROVIDER` | `auto` | `auto` / `claude` / `local` |
+| `AI_PROVIDER` | `auto` | `auto` / `claude` / `openai` / `gemini` / `local` |
+| `OPENAI_API_KEY` | — | OpenAI API key |
+| `OPENAI_MODEL` | `gpt-4o-mini` | Default OpenAI model |
+| `GEMINI_API_KEY` | — | Google Gemini API key |
+| `GEMINI_MODEL` | `gemini-2.0-flash` | Default Gemini model |
 | `LOCAL_AI_URL` | `http://localhost:1234/v1` | LM Studio / Ollama base URL |
 | `LOCAL_AI_MODEL` | _(auto-detect)_ | Specific local model name |
 
