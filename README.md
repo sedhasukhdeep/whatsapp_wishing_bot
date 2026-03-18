@@ -30,7 +30,14 @@ Three services run together:
 - Node.js 18+
 - An [Anthropic API key](https://console.anthropic.com/) (or a local LLM via LM Studio / Ollama)
 
-### 1. Backend
+### 1. Clone the repo
+
+```bash
+git clone https://github.com/sedhasukhdeep/whatsapp_wishing_bot.git
+cd whatsapp_wishing_bot
+```
+
+### 2. Backend
 
 ```bash
 cd backend
@@ -40,18 +47,18 @@ cp .env.example .env          # then open .env and set ANTHROPIC_API_KEY
 alembic upgrade head          # creates wishing_bot.db
 ```
 
-### 2. WhatsApp bridge
+### 3. WhatsApp bridge
 
 ```bash
-cd whatsapp-bridge
+cd ../whatsapp-bridge
 npm install
 cp .env.example .env          # sets PORT=3001 and BACKEND_URL=http://localhost:8000
 ```
 
-### 3. Frontend
+### 4. Frontend
 
 ```bash
-cd frontend
+cd ../frontend
 npm install
 # frontend/.env is auto-created by start.sh — no manual step needed
 ```
@@ -59,6 +66,7 @@ npm install
 ### Run everything
 
 ```bash
+cd ..
 ./start.sh
 ```
 
