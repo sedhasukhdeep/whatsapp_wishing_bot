@@ -182,7 +182,7 @@ open http://localhost:8000/docs
 | `ANTHROPIC_API_KEY` | — | Claude API key |
 | `WA_BRIDGE_URL` | `http://localhost:3001` | WhatsApp bridge URL |
 | `FRONTEND_ORIGIN` | `http://localhost:5173` | Allowed CORS origin |
-| `SCHEDULER_TIMEZONE` | `Asia/Kolkata` | Timezone for daily draft generation |
+| `SCHEDULER_TIMEZONE` | `Australia/Sydney` | Timezone for daily draft generation |
 | `SCHEDULER_HOUR` | `8` | Hour for daily run |
 | `SCHEDULER_MINUTE` | `0` | Minute for daily run |
 | `DB_URL` | `sqlite:///./wishing_bot.db` | SQLAlchemy database URL |

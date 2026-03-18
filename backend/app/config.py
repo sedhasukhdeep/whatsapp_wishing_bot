@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     db_url: str = "sqlite:///./wishing_bot.db"
     wa_bridge_url: str = "http://localhost:3001"
-    scheduler_timezone: str = "Asia/Kolkata"
+    scheduler_timezone: str = "Australia/Sydney"
     scheduler_hour: int = 8
     scheduler_minute: int = 0
 

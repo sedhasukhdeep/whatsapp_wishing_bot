@@ -28,18 +28,26 @@ docker run -d \
 ```bash
 docker build -t wishing-backend ./backend
 
+# Set AI_PROVIDER to the provider you want and fill in the corresponding API key.
 docker run -d \
   --name wishing-backend \
   --network wishing-net \
   --restart unless-stopped \
   -v wishing-db:/app/data \
+  -e AI_PROVIDER="claude" \
   -e ANTHROPIC_API_KEY="sk-ant-YOUR_KEY_HERE" \
+  -e OPENAI_API_KEY="" \
+  -e OPENAI_MODEL="gpt-4o-mini" \
+  -e GEMINI_API_KEY="" \
+  -e GEMINI_MODEL="gemini-2.0-flash" \
+  -e LOCAL_AI_URL="http://localhost:1234/v1" \
+  -e LOCAL_AI_MODEL="" \
   -e DB_URL="sqlite:////app/data/wishing_bot.db" \
   -e WA_BRIDGE_URL="http://wishing-bridge:3001" \
   -e FRONTEND_ORIGIN="http://localhost" \
-  -e SCHEDULER_TIMEZONE="Asia/Kolkata" \
+  -e SCHEDULER_TIMEZONE="Australia/Sydney" \
   -e SCHEDULER_HOUR="8" \
-  -e AI_PROVIDER="claude" \
+  -e SCHEDULER_MINUTE="0" \
   wishing-backend
 ```
 

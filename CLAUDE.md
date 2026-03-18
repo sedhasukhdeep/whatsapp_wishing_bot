@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Standing Instructions
+
+- After completing any code changes, always commit them and push to GitHub.
+
 ## Project Overview
 
 A personal web app to send AI-generated birthday/anniversary/occasion greetings on WhatsApp. Daily scheduler generates Claude-powered drafts, user reviews/edits in a browser dashboard, then sends with one click.
