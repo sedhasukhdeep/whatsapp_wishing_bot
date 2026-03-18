@@ -4,6 +4,7 @@ const path = require('path');
 
 let isReady = false;
 let currentQR = null;
+let state = 'starting';
 
 const client = new Client({
   authStrategy: new LocalAuth({
@@ -23,6 +24,7 @@ const client = new Client({
 client.on('qr', async (qrString) => {
   console.log('[WA] QR received — scan with WhatsApp');
   isReady = false;
+  state = 'qr';
   try {
     currentQR = await qrcode.toDataURL(qrString);
   } catch (err) {
@@ -34,6 +36,7 @@ client.on('ready', () => {
   console.log('[WA] Client ready');
   isReady = true;
   currentQR = null;
+  state = 'ready';
 });
 
 client.on('authenticated', () => {
@@ -44,13 +47,18 @@ client.on('authenticated', () => {
 client.on('auth_failure', (msg) => {
   console.error('[WA] Auth failure:', msg);
   isReady = false;
+  state = 'error';
 });
 
 client.on('disconnected', (reason) => {
   console.warn('[WA] Disconnected:', reason);
   isReady = false;
   currentQR = null;
-  client.initialize().catch((err) => console.error('[WA] Re-init error:', err));
+  state = 'disconnected';
+  setTimeout(() => {
+    state = 'starting';
+    client.initialize().catch((err) => console.error('[WA] Re-init error:', err));
+  }, 5000);
 });
 
 const BACKEND_URL = process.env.BACKEND_URL || '';
@@ -87,7 +95,7 @@ client.on('message_create', async (msg) => {
 });
 
 function getStatus() {
-  return { ready: isReady, qr_image: currentQR };
+  return { ready: isReady, qr_image: currentQR, state };
 }
 
 async function sendMessage(chatId, message) {

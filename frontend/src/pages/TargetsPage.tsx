@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { CheckCircle2, ChevronDown, Plus, RefreshCw, WifiOff } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Loader2, Plus, RefreshCw, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface TargetFormState {
@@ -46,6 +46,8 @@ export default function TargetsPage() {
   const [confirmDelete, setConfirmDelete] = useState<WhatsAppTarget | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [pollError, setPollError] = useState(false);
+  const pollErrorCount = useRef(0);
   const searchRef = useRef<HTMLInputElement>(null);
 
   async function load() {
@@ -59,8 +61,15 @@ export default function TargetsPage() {
   useEffect(() => {
     if (status?.ready) return;
     const id = setInterval(async () => {
-      const s = await getBridgeStatus();
-      setStatus(s);
+      try {
+        const s = await getBridgeStatus();
+        setStatus(s);
+        pollErrorCount.current = 0;
+        setPollError(false);
+      } catch {
+        pollErrorCount.current += 1;
+        if (pollErrorCount.current >= 5) setPollError(true);
+      }
     }, 4000);
     return () => clearInterval(id);
   }, [status?.ready]);
@@ -141,12 +150,30 @@ export default function TargetsPage() {
       {/* Bridge status */}
       <Card className="mb-6">
         <CardContent className="pt-4">
+          {pollError && (
+            <div className="mb-3 text-sm text-destructive bg-destructive/10 rounded px-3 py-2">
+              Bridge is not responding. Try restarting the app.
+            </div>
+          )}
           <div className="flex items-center gap-3 mb-3">
             {status?.ready
               ? <CheckCircle2 size={18} className="text-emerald-500" />
-              : <WifiOff size={18} className="text-amber-500" />}
+              : status?.state === 'starting'
+                ? <Loader2 size={18} className="text-muted-foreground animate-spin" />
+                : status?.state === 'disconnected'
+                  ? <WifiOff size={18} className="text-amber-500" />
+                  : <WifiOff size={18} className="text-amber-500" />}
             <span className="font-semibold">
-              WhatsApp: {status?.ready ? 'Connected' : 'Not connected — scan QR to link your phone'}
+              WhatsApp:{' '}
+              {status?.ready
+                ? 'Connected'
+                : status?.state === 'starting'
+                  ? 'Starting up...'
+                  : status?.state === 'disconnected'
+                    ? 'Disconnected — reconnecting...'
+                    : status?.state === 'error' && !status?.qr_image
+                      ? 'Bridge is not responding'
+                      : 'Not connected — scan QR to link your phone'}
             </span>
             <Button variant="outline" size="sm" onClick={load} className="ml-auto gap-1">
               <RefreshCw size={12} />
@@ -159,6 +186,10 @@ export default function TargetsPage() {
                 Open WhatsApp → Settings → Linked Devices → Link a Device → scan below
               </p>
               <img src={status.qr_image} alt="WhatsApp QR" className="w-44 h-44 rounded-lg border" />
+              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                <Loader2 size={10} className="animate-spin" />
+                Refreshing...
+              </p>
             </div>
           )}
         </CardContent>

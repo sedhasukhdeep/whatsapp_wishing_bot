@@ -87,6 +87,7 @@ export interface DashboardUpcomingItem {
 export interface BridgeStatus {
   ready: boolean;
   qr_image: string | null;
+  state?: 'starting' | 'qr' | 'ready' | 'disconnected' | 'error' | null;
 }
 
 export interface CalendarImportPreviewItem {

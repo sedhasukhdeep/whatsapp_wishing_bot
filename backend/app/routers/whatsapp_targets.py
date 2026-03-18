@@ -58,7 +58,7 @@ async def bridge_status():
             resp.raise_for_status()
             return resp.json()
     except httpx.HTTPError:
-        return BridgeStatus(ready=False, qr_image=None)
+        return BridgeStatus(ready=False, qr_image=None, state='error')
 
 
 @router.get("/chats")

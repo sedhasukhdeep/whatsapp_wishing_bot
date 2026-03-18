@@ -28,10 +28,16 @@ app.listen(PORT, HOST, () => {
 const SESSION_DIR = path.join(__dirname, '..', 'session', 'session');
 cleanStaleLocks(SESSION_DIR);
 
-client.initialize().catch((err) => {
-  console.error('[WA] Initialization error:', err);
-  process.exit(1);
-});
+async function initWithRetry(attemptsLeft = 3) {
+  try {
+    await client.initialize();
+  } catch (err) {
+    console.error(`[WA] Initialization error (${attemptsLeft} attempts left):`, err.message);
+    if (attemptsLeft <= 1) { process.exit(1); }
+    setTimeout(() => initWithRetry(attemptsLeft - 1), 10_000);
+  }
+}
+initWithRetry();
 
 // Graceful shutdown — lets whatsapp-web.js terminate Chrome cleanly so lock files are removed
 async function shutdown(signal) {

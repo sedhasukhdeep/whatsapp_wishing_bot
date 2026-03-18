@@ -1,6 +1,6 @@
 const express = require('express');
 const { MessageMedia } = require('whatsapp-web.js');
-const { getStatus } = require('../client');
+const { getStatus, client } = require('../client');
 
 const router = express.Router();
 
@@ -17,8 +17,8 @@ router.post('/send-gif', async (req, res) => {
     return res.status(400).json({ error: 'Invalid chat_id format' });
   }
 
-  const { ready, client } = getStatus();
-  if (!ready || !client) {
+  const { ready } = getStatus();
+  if (!ready) {
     return res.status(503).json({ error: 'WhatsApp not connected' });
   }
 

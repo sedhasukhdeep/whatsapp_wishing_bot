@@ -51,3 +51,4 @@ class WhatsAppTargetOut(WhatsAppTargetBase):
 class BridgeStatus(BaseModel):
     ready: bool
     qr_image: str | None = None
+    state: str | None = None
