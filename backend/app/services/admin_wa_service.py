@@ -19,10 +19,13 @@ def get_admin_chat_id(db: Session) -> str | None:
 
 
 def parse_command(text: str) -> tuple[str, list[str]]:
-    parts = text.strip().lower().split()
-    if not parts:
+    stripped = text.strip()
+    if not stripped:
         return "", []
-    return parts[0], parts[1:]
+    parts = stripped.split()
+    # Only lowercase the command word; preserve original case in args so regenerate
+    # context text is not mangled.
+    return parts[0].lower(), parts[1:]
 
 
 def format_today_notification(occasions_with_drafts: list, today: date) -> str:
@@ -50,7 +53,7 @@ def format_today_notification(occasions_with_drafts: list, today: date) -> str:
         lines.append(f'"{draft_text}"')
         lines.append(f"Status: {status}\n")
 
-    lines.append("Commands: approve <id> · send <id> · skip <id>")
+    lines.append("Commands: approve <id> · send <id> · skip <id> · regenerate <id> [context]")
     lines.append("Type 'help' for all commands")
     return "\n".join(lines)
 
@@ -135,7 +138,8 @@ async def handle_command(command: str, args: list[str], db: Session) -> str:
             "• approve <id> — approve draft\n"
             "• send <id> — approve and send\n"
             "• skip <id> — skip draft\n"
-            "• regenerate <id> — regenerate draft text\n"
+            "• regenerate <id> [context] — regenerate draft text\n"
+            "  e.g. regenerate #3 make it funnier and mention our trip\n"
             "• upcoming — next 7 days\n"
             "• help — this message"
         )
@@ -239,8 +243,15 @@ async def handle_command(command: str, args: list[str], db: Session) -> str:
         if command == "regenerate":
             from app.services.claude_service import generate_message
 
+            # args[1:] is the optional free-text context, e.g.
+            # "regenerate #3 make it funnier and mention our trip to Paris"
+            extra_context = " ".join(args[1:]) if len(args) > 1 else None
+
             try:
-                new_text, prompt = await generate_message(draft.contact, draft.occasion, draft.occasion_date, db=db)
+                new_text, prompt = await generate_message(
+                    draft.contact, draft.occasion, draft.occasion_date,
+                    db=db, extra_context=extra_context,
+                )
             except Exception as e:
                 return f"Regeneration failed: {e}"
 
@@ -251,6 +262,7 @@ async def handle_command(command: str, args: list[str], db: Session) -> str:
             db.commit()
 
             preview = new_text[:150] + "…" if len(new_text) > 150 else new_text
-            return f"✓ Draft #{draft_id} regenerated:\n\"{preview}\""
+            context_note = f" (context: {extra_context[:60]})" if extra_context else ""
+            return f"✓ Draft #{draft_id} regenerated{context_note}:\n\"{preview}\""
 
     return "Unknown command. Type 'help'."

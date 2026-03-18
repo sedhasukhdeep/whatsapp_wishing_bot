@@ -69,7 +69,9 @@ def _get_effective_settings(db=None) -> dict:
     }
 
 
-def _build_prompt(contact: Contact, occasion: Occasion, on_date: date) -> str:
+def _build_prompt(
+    contact: Contact, occasion: Occasion, on_date: date, extra_context: str | None = None
+) -> str:
     occasion_display = build_occasion_display(occasion, on_date)
 
     # Occasion-level overrides take priority over contact defaults
@@ -88,6 +90,8 @@ def _build_prompt(contact: Contact, occasion: Occasion, on_date: date) -> str:
         parts.append(f"Personal details to weave in: {contact.notes}.")
     if instructions:
         parts.append(instructions)
+    if extra_context:
+        parts.append(f"Additional instructions: {extra_context}")
 
     return " ".join(parts)
 
@@ -252,11 +256,15 @@ async def _call_provider(prompt: str, ai: dict) -> str:
 
 
 async def generate_message(
-    contact: Contact, occasion: Occasion, on_date: date, db=None
+    contact: Contact, occasion: Occasion, on_date: date, db=None, extra_context: str | None = None
 ) -> tuple[str, str]:
-    """Returns (generated_text, prompt_used)."""
+    """Returns (generated_text, prompt_used).
+
+    extra_context: optional free-text instructions appended to the prompt,
+    e.g. from the WhatsApp admin command 'regenerate #3 make it funnier'.
+    """
     ai = _get_effective_settings(db)
-    prompt = _build_prompt(contact, occasion, on_date)
+    prompt = _build_prompt(contact, occasion, on_date, extra_context=extra_context)
     text = await _call_provider(prompt, ai)
     return text, prompt
 
