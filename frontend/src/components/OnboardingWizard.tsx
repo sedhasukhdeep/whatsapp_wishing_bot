@@ -2,16 +2,57 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getBridgeStatus } from '../api/client';
 import type { BridgeStatus } from '../types';
+import { Button } from '@/components/ui/button';
+import { CheckCircle2, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+const TOUR_SEEN_KEY = 'wishing_bot_tour_seen';
 
 interface Props {
   onDismiss: () => void;
 }
+
+const STEPS = [
+  {
+    title: 'Welcome to Wishing Bot',
+    subtitle: 'Your personal AI assistant for sending heartfelt greetings on WhatsApp.',
+  },
+  {
+    title: 'Connect WhatsApp',
+    subtitle: 'Scan the QR code with your WhatsApp to enable sending messages.',
+  },
+  {
+    title: 'Add Contacts & Occasions',
+    subtitle: 'Add people you care about and set up their birthdays, anniversaries, and more.',
+  },
+  {
+    title: 'The Dashboard',
+    subtitle: 'Review AI-drafted messages each day, then send with one click.',
+  },
+  {
+    title: 'Calendar, History & Broadcasts',
+    subtitle: 'Visualise upcoming occasions, browse sent messages, and send group blasts.',
+  },
+  {
+    title: 'Settings',
+    subtitle: 'Configure your AI provider, Giphy GIFs, and WhatsApp admin notifications.',
+  },
+  {
+    title: "You're all set!",
+    subtitle: 'Everything you need to never miss another occasion.',
+  },
+];
 
 export default function OnboardingWizard({ onDismiss }: Props) {
   const [step, setStep] = useState(0);
   const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus | null>(null);
   const [checking, setChecking] = useState(false);
   const nav = useNavigate();
+
+  function dismiss() {
+    localStorage.setItem(TOUR_SEEN_KEY, '1');
+    onDismiss();
+  }
 
   async function checkBridge() {
     setChecking(true);
@@ -26,140 +67,305 @@ export default function OnboardingWizard({ onDismiss }: Props) {
   }
 
   useEffect(() => {
-    if (step === 0) checkBridge();
+    if (step === 1) checkBridge();
   }, [step]);
 
-  // Poll for QR code or connected status
   useEffect(() => {
-    if (step !== 0) return;
+    if (step !== 1) return;
     const timer = setInterval(checkBridge, 4000);
     return () => clearInterval(timer);
   }, [step]);
 
-  const steps = [
-    {
-      title: 'Connect WhatsApp',
-      subtitle: 'Scan the QR code with your WhatsApp to enable sending messages.',
-    },
-    {
-      title: 'Add your first contact',
-      subtitle: 'Add someone you want to send greetings to.',
-    },
-    {
-      title: "You're all set!",
-      subtitle: 'The dashboard shows today\'s occasions. Click "Generate Today\'s Messages" to create drafts.',
-    },
-  ];
+  const isLast = step === STEPS.length - 1;
 
   return (
-    <div style={overlay}>
-      <div style={modal}>
-        {/* Step indicators */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 24 }}>
-          {steps.map((_, i) => (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-card text-card-foreground rounded-xl p-8 w-[500px] max-w-[95%] shadow-2xl border relative">
+        {/* Close / skip button */}
+        <button
+          onClick={dismiss}
+          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
+          aria-label="Skip tour"
+        >
+          <X size={18} />
+        </button>
+
+        {/* Step dots */}
+        <div className="flex justify-center gap-2 mb-6">
+          {STEPS.map((_, i) => (
             <div
               key={i}
-              style={{
-                width: 8, height: 8, borderRadius: '50%',
-                background: i === step ? '#2563eb' : i < step ? '#10b981' : '#e5e7eb',
-              }}
+              className={cn(
+                'w-2 h-2 rounded-full transition-colors',
+                i === step ? 'bg-primary' : i < step ? 'bg-emerald-500' : 'bg-border'
+              )}
             />
           ))}
         </div>
 
-        <h2 style={{ margin: '0 0 6px', fontSize: 20, fontWeight: 700 }}>{steps[step].title}</h2>
-        <p style={{ margin: '0 0 24px', fontSize: 14, color: '#6b7280' }}>{steps[step].subtitle}</p>
+        <h2 className="text-xl font-bold mb-1">{STEPS[step].title}</h2>
+        <p className="text-sm text-muted-foreground mb-6">{STEPS[step].subtitle}</p>
 
-        {/* Step 0: Connect WhatsApp */}
+        {/* Step 0: Welcome */}
         {step === 0 && (
           <div>
+            <div className="rounded-lg bg-muted/50 p-5 space-y-3 text-sm">
+              <div className="flex items-start gap-3">
+                <span className="text-xl">🤖</span>
+                <div>
+                  <div className="font-medium">AI-generated drafts</div>
+                  <div className="text-muted-foreground">Every morning, Claude writes personalised messages for today's occasions.</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-xl">👀</span>
+                <div>
+                  <div className="font-medium">You stay in control</div>
+                  <div className="text-muted-foreground">Review, edit, or skip each draft from the Dashboard before anything is sent.</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-xl">💬</span>
+                <div>
+                  <div className="font-medium">One-click WhatsApp delivery</div>
+                  <div className="text-muted-foreground">Approved messages are sent via your own WhatsApp account — no third-party services.</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-between mt-6">
+              <Button variant="ghost" onClick={dismiss}>Skip tour</Button>
+              <Button onClick={() => setStep(1)}>Next →</Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 1: Connect WhatsApp */}
+        {step === 1 && (
+          <div>
             {bridgeStatus?.ready ? (
-              <div style={successBox}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>WhatsApp Connected</div>
-                <div style={{ fontSize: 13, color: '#6b7280' }}>Your WhatsApp is connected and ready to send messages.</div>
+              <div className="text-center p-5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+                <CheckCircle2 size={32} className="text-emerald-500 mx-auto mb-2" />
+                <div className="font-semibold mb-1">WhatsApp Connected</div>
+                <div className="text-sm text-muted-foreground">Your WhatsApp is connected and ready.</div>
               </div>
             ) : bridgeStatus?.qr_image ? (
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: 13, color: '#374151', marginBottom: 12 }}>
-                  Open WhatsApp on your phone → Settings → Linked Devices → Link a Device
+              <div className="text-center">
+                <p className="text-sm text-foreground mb-3">
+                  Open WhatsApp → Settings → Linked Devices → Link a Device
                 </p>
-                <img
-                  src={bridgeStatus.qr_image}
-                  alt="WhatsApp QR Code"
-                  style={{ maxWidth: 220, border: '1px solid #e5e7eb', borderRadius: 8 }}
-                />
-                <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 8 }}>Refreshing automatically...</p>
+                <img src={bridgeStatus.qr_image} alt="WhatsApp QR Code" className="max-w-[200px] mx-auto rounded-lg border" />
+                <p className="text-xs text-muted-foreground mt-2">Refreshing automatically...</p>
               </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+              <div className="text-center py-4">
                 {checking ? (
-                  <p style={{ color: '#6b7280', fontSize: 14 }}>Connecting to WhatsApp bridge...</p>
+                  <p className="text-muted-foreground text-sm">Connecting to WhatsApp bridge...</p>
                 ) : (
                   <div>
-                    <p style={{ color: '#dc2626', fontSize: 14, marginBottom: 12 }}>
-                      WhatsApp bridge is not running. Make sure you started the app with <code>./start.sh</code>
+                    <p className="text-destructive text-sm mb-3">
+                      WhatsApp bridge is not running. Start the app with{' '}
+                      <code className="bg-muted px-1 rounded">./start.sh</code>
                     </p>
-                    <button onClick={checkBridge} style={btnSecondary}>Retry</button>
+                    <Button variant="outline" size="sm" onClick={checkBridge}>Retry</Button>
                   </div>
                 )}
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
-              <button onClick={onDismiss} style={btnGhost}>Skip setup</button>
-              <button
-                onClick={() => setStep(1)}
-                disabled={!bridgeStatus?.ready}
-                style={{ ...btnPrimary, opacity: bridgeStatus?.ready ? 1 : 0.5 }}
-              >
+            <div className="flex justify-between mt-6">
+              <Button variant="ghost" onClick={() => setStep(0)}>← Back</Button>
+              <Button onClick={() => setStep(2)} disabled={!bridgeStatus?.ready}>
                 Next →
-              </button>
+              </Button>
             </div>
           </div>
         )}
 
-        {/* Step 1: Add first contact */}
-        {step === 1 && (
+        {/* Step 2: Add Contacts & Occasions */}
+        {step === 2 && (
           <div>
-            <div style={stepContent}>
-              <div style={{ fontSize: 40, marginBottom: 16 }}>👤</div>
-              <p style={{ fontSize: 14, color: '#374151', margin: '0 0 8px' }}>
-                Go to the Contacts page and add your first contact — their name, phone number, and relationship.
-              </p>
-              <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>
-                You can link their WhatsApp chat so messages send with one click.
-              </p>
+            <div className="rounded-lg bg-muted/50 p-5 space-y-3 text-sm">
+              <div className="flex items-start gap-3">
+                <span className="text-xl">👤</span>
+                <div>
+                  <div className="font-medium">Contacts page</div>
+                  <div className="text-muted-foreground">Add name, phone number, relationship, and a short "about" note so the AI can personalise messages.</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-xl">🎂</span>
+                <div>
+                  <div className="font-medium">Occasion types</div>
+                  <div className="text-muted-foreground">Birthday, anniversary, work anniversary, custom — you can add multiple occasions per contact.</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-xl">📲</span>
+                <div>
+                  <div className="font-medium">Link WhatsApp chat</div>
+                  <div className="text-muted-foreground">Go to WhatsApp → Targets and grab the chat ID, then paste it on the contact form.</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-xl">📅</span>
+                <div>
+                  <div className="font-medium">ICS import tip</div>
+                  <div className="text-muted-foreground">Use <span className="font-mono text-xs bg-background px-1 rounded">Import Calendar</span> in the sidebar to bulk-import birthdays from a .ics file.</div>
+                </div>
+              </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
-              <button onClick={() => setStep(0)} style={btnGhost}>← Back</button>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  onClick={() => { onDismiss(); nav('/contacts/new'); }}
-                  style={btnPrimary}
-                >
+            <div className="flex justify-between mt-6">
+              <Button variant="ghost" onClick={() => setStep(1)}>← Back</Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => { dismiss(); nav('/contacts/new'); }}>
                   Add Contact →
-                </button>
+                </Button>
+                <Button onClick={() => setStep(3)}>Next →</Button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Step 2: Done */}
-        {step === 2 && (
+        {/* Step 3: The Dashboard */}
+        {step === 3 && (
           <div>
-            <div style={{ textAlign: 'center', padding: '10px 0 20px' }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
-              <p style={{ fontSize: 14, color: '#374151', margin: '0 0 8px' }}>
-                Each morning at 8am, the scheduler generates AI drafts for today's occasions.
-              </p>
-              <p style={{ fontSize: 13, color: '#6b7280' }}>
-                You review, edit, and send from the Dashboard.
+            <div className="rounded-lg bg-muted/50 p-5 space-y-3 text-sm">
+              <div className="flex items-start gap-3">
+                <span className="text-xl">✨</span>
+                <div>
+                  <div className="font-medium">Generate Today's Messages</div>
+                  <div className="text-muted-foreground">Hit the button (or wait for 8 am) to create AI drafts for all of today's occasions.</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-xl">✏️</span>
+                <div>
+                  <div className="font-medium">Approve / Edit / Skip</div>
+                  <div className="text-muted-foreground">Each card lets you approve the draft as-is, tweak the text, skip it, or regenerate with a fresh AI attempt.</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-xl">🎉</span>
+                <div>
+                  <div className="font-medium">GIF picker</div>
+                  <div className="text-muted-foreground">Add a Giphy GIF to any message before sending — add your Giphy API key in Settings to unlock this.</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-xl">📤</span>
+                <div>
+                  <div className="font-medium">Send</div>
+                  <div className="text-muted-foreground">Approved messages are sent directly to the contact's WhatsApp chat with one click.</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-between mt-6">
+              <Button variant="ghost" onClick={() => setStep(2)}>← Back</Button>
+              <Button onClick={() => setStep(4)}>Next →</Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Calendar, History & Broadcasts */}
+        {step === 4 && (
+          <div>
+            <div className="rounded-lg bg-muted/50 p-5 space-y-3 text-sm">
+              <div className="flex items-start gap-3">
+                <span className="text-xl">📆</span>
+                <div>
+                  <div className="font-medium">Calendar</div>
+                  <div className="text-muted-foreground">Month-view overview of all upcoming occasions — great for planning ahead.</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-xl">📜</span>
+                <div>
+                  <div className="font-medium">History</div>
+                  <div className="text-muted-foreground">Browse all messages you've sent, skipped, or left pending — full audit trail.</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-xl">📡</span>
+                <div>
+                  <div className="font-medium">Broadcasts</div>
+                  <div className="text-muted-foreground">Send the same message to multiple contacts at once — useful for group announcements or festival wishes.</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-between mt-6">
+              <Button variant="ghost" onClick={() => setStep(3)}>← Back</Button>
+              <Button onClick={() => setStep(5)}>Next →</Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Settings */}
+        {step === 5 && (
+          <div>
+            <div className="rounded-lg bg-muted/50 p-5 space-y-3 text-sm">
+              <div className="flex items-start gap-3">
+                <span className="text-xl">🧠</span>
+                <div>
+                  <div className="font-medium">AI Provider</div>
+                  <div className="text-muted-foreground">Switch between Claude (cloud) and a local LLM via LM Studio / Ollama for offline use.</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-xl">🎬</span>
+                <div>
+                  <div className="font-medium">Giphy API Key</div>
+                  <div className="text-muted-foreground">Get a free key at developers.giphy.com and paste it here to enable the GIF picker in Dashboard cards.</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-xl">🔔</span>
+                <div>
+                  <div className="font-medium">Admin WhatsApp Notifications</div>
+                  <div className="text-muted-foreground">Receive a WhatsApp message each morning listing today's occasions and draft status.</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-xl">🤖</span>
+                <div>
+                  <div className="font-medium">Bot Commands</div>
+                  <div className="text-muted-foreground">Reply to the bot's messages with commands like <span className="font-mono text-xs bg-background px-1 rounded">send all</span> to approve and send everything remotely.</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-between mt-6">
+              <Button variant="ghost" onClick={() => setStep(4)}>← Back</Button>
+              <Button onClick={() => setStep(6)}>Next →</Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 6: All set */}
+        {step === 6 && (
+          <div>
+            <div className="text-center py-2 mb-4">
+              <div className="text-5xl mb-3">🎉</div>
+            </div>
+            <div className="rounded-lg bg-muted/50 p-5 text-sm space-y-2">
+              <div className="font-medium mb-2">Quick-start checklist</div>
+              <ul className="space-y-1.5 text-muted-foreground">
+                <li>✅ Connect WhatsApp (Targets page → scan QR)</li>
+                <li>✅ Add contacts with occasions (Contacts page)</li>
+                <li>✅ Generate today's drafts (Dashboard → Generate button)</li>
+                <li>✅ Review, approve, and send!</li>
+              </ul>
+              <p className="text-xs text-muted-foreground pt-2 border-t border-border mt-3">
+                You can always reopen this guide from the <strong>"How to use"</strong> link at the bottom of the sidebar.
               </p>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <button onClick={onDismiss} style={btnPrimary}>Go to Dashboard</button>
+
+            <div className="flex justify-between mt-6">
+              <Button variant="ghost" onClick={() => setStep(5)}>← Back</Button>
+              <Button onClick={dismiss}>Done</Button>
             </div>
           </div>
         )}
@@ -167,20 +373,3 @@ export default function OnboardingWizard({ onDismiss }: Props) {
     </div>
   );
 }
-
-const overlay: React.CSSProperties = {
-  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
-};
-const modal: React.CSSProperties = {
-  background: '#fff', borderRadius: 12, padding: 32, width: 460, maxWidth: '95%',
-  boxShadow: '0 16px 48px rgba(0,0,0,0.2)',
-};
-const successBox: React.CSSProperties = {
-  textAlign: 'center', padding: '20px 24px', background: '#f0fdf4',
-  border: '1px solid #bbf7d0', borderRadius: 8,
-};
-const stepContent: React.CSSProperties = { textAlign: 'center', padding: '10px 0' };
-const btnPrimary: React.CSSProperties = { padding: '10px 20px', borderRadius: 6, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 500 };
-const btnGhost: React.CSSProperties = { padding: '10px 16px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontSize: 13, color: '#6b7280' };
-const btnSecondary: React.CSSProperties = { padding: '8px 16px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontSize: 13 };

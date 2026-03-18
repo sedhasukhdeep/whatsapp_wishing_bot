@@ -56,3 +56,17 @@ class OccasionOut(OccasionBase):
 
     id: int
     created_at: datetime
+
+
+# Phase 5: Calendar view
+class CalendarOccasionEntry(BaseModel):
+    contact_id: int
+    contact_name: str
+    occasion_id: int
+    type: str
+    label: str | None
+
+
+class CalendarDayItem(BaseModel):
+    day: int
+    occasions: list[CalendarOccasionEntry]

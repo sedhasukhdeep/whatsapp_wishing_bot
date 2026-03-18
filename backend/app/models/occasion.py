@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, SmallInteger, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, SmallInteger, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -26,5 +26,5 @@ class Occasion(Base):
 
     contact: Mapped["Contact"] = relationship("Contact", back_populates="occasions")  # noqa: F821
     drafts: Mapped[list["MessageDraft"]] = relationship(  # noqa: F821
-        "MessageDraft", back_populates="occasion"
+        "MessageDraft", back_populates="occasion", cascade="all, delete-orphan"
     )

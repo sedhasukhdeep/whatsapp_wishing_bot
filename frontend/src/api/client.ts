@@ -1,6 +1,13 @@
 import axios from 'axios';
 import type {
+  AISettings,
+  AISettingsUpdate,
+  AIStatus,
+  Broadcast,
+  GiphyResult,
+  BroadcastWithRecipients,
   BridgeStatus,
+  CalendarDay,
   CalendarImportConfirmItem,
   CalendarImportPreviewItem,
   CalendarImportResult,
@@ -8,6 +15,7 @@ import type {
   ContactWithOccasions,
   DashboardOccasionItem,
   DashboardUpcomingItem,
+  DraftHistoryItem,
   MessageDraft,
   Occasion,
   WhatsAppTarget,
@@ -62,6 +70,10 @@ export const updateOccasion = (id: number, data: Omit<Occasion, 'id' | 'created_
 
 export const deleteOccasion = (id: number) => api.delete(`/api/occasions/${id}`);
 
+// Calendar occasions view (Phase 5)
+export const getCalendarOccasions = (month: number, year: number) =>
+  api.get<CalendarDay[]>('/api/occasions/calendar', { params: { month, year } }).then((r) => r.data);
+
 // WhatsApp Targets
 export const listTargets = () =>
   api.get<WhatsAppTarget[]>('/api/targets').then((r) => r.data);
@@ -89,7 +101,7 @@ export const getDashboardUpcoming = () =>
   api.get<DashboardUpcomingItem[]>('/api/dashboard/upcoming').then((r) => r.data);
 
 export const triggerGenerate = () =>
-  api.post<{ drafts_created: number }>('/api/dashboard/generate').then((r) => r.data);
+  api.post<{ drafts_created: number }>('/api/dashboard/generate', null, { timeout: 300000 }).then((r) => r.data);
 
 // Drafts
 export const approveDraft = (id: number, edited_text?: string) =>
@@ -99,10 +111,14 @@ export const skipDraft = (id: number) =>
   api.patch<MessageDraft>(`/api/drafts/${id}/skip`).then((r) => r.data);
 
 export const regenerateDraft = (id: number) =>
-  api.post<MessageDraft>(`/api/drafts/${id}/regenerate`).then((r) => r.data);
+  api.post<MessageDraft>(`/api/drafts/${id}/regenerate`, null, { timeout: 300000 }).then((r) => r.data);
 
-export const sendDraft = (id: number, target_id: number | null) =>
-  api.post<MessageDraft>(`/api/drafts/${id}/send`, { target_id }).then((r) => r.data);
+export const sendDraft = (id: number, target_id: number | null, gif_url?: string | null) =>
+  api.post<MessageDraft>(`/api/drafts/${id}/send`, { target_id, gif_url }).then((r) => r.data);
+
+// History (Phase 4)
+export const getDraftHistory = () =>
+  api.get<DraftHistoryItem[]>('/api/drafts/history').then((r) => r.data);
 
 // Calendar Import
 export const previewCalendarImport = (file: File) => {
@@ -113,3 +129,42 @@ export const previewCalendarImport = (file: File) => {
 
 export const confirmCalendarImport = (items: CalendarImportConfirmItem[]) =>
   api.post<CalendarImportResult>('/api/calendar/confirm', { items }).then((r) => r.data);
+
+// Broadcasts (Phase 7)
+export const listBroadcasts = () =>
+  api.get<Broadcast[]>('/api/broadcasts').then((r) => r.data);
+
+export const createBroadcast = (data: { name: string; occasion_name: string }) =>
+  api.post<Broadcast>('/api/broadcasts', data).then((r) => r.data);
+
+export const getBroadcast = (id: number) =>
+  api.get<BroadcastWithRecipients>(`/api/broadcasts/${id}`).then((r) => r.data);
+
+export const deleteBroadcast = (id: number) =>
+  api.delete(`/api/broadcasts/${id}`);
+
+export const generateBroadcastMessage = (id: number) =>
+  api.post<Broadcast>(`/api/broadcasts/${id}/generate`).then((r) => r.data);
+
+export const addBroadcastRecipients = (id: number, data: { contact_ids: number[]; target_ids: number[] }) =>
+  api.post<BroadcastWithRecipients>(`/api/broadcasts/${id}/recipients`, data).then((r) => r.data);
+
+export const removeBroadcastRecipient = (broadcastId: number, recipientId: number) =>
+  api.delete(`/api/broadcasts/${broadcastId}/recipients/${recipientId}`);
+
+export const sendBroadcast = (id: number) =>
+  api.post(`/api/broadcasts/${id}/send`);
+
+// Admin Settings
+export const getAISettings = () =>
+  api.get<AISettings>('/api/admin/settings').then((r) => r.data);
+
+export const updateAISettings = (data: AISettingsUpdate) =>
+  api.put<AISettings>('/api/admin/settings', data).then((r) => r.data);
+
+export const getAIStatus = () =>
+  api.get<AIStatus>('/api/admin/ai-status').then((r) => r.data);
+
+// Giphy proxy
+export const searchGifs = (q: string) =>
+  api.get<{ data: GiphyResult[] }>('/api/giphy/search', { params: { q } }).then((r) => r.data);

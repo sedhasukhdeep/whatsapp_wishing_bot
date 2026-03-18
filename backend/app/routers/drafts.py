@@ -1,13 +1,13 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models import MessageDraft, WhatsAppTarget
-from app.schemas.message_draft import DraftApproveRequest, DraftSendRequest, MessageDraftOut
+from app.schemas.message_draft import DraftApproveRequest, DraftHistoryItem, DraftSendRequest, MessageDraftOut
 from app.services.claude_service import generate_message
-from app.services.whatsapp_service import send_whatsapp_message
+from app.services.whatsapp_service import send_whatsapp_gif, send_whatsapp_message
 
 router = APIRouter(prefix="/api/drafts", tags=["drafts"])
 
@@ -18,6 +18,19 @@ def list_drafts(status: str = "", db: Session = Depends(get_db)):
     if status:
         q = q.filter(MessageDraft.status == status)
     return q.order_by(MessageDraft.occasion_date.desc(), MessageDraft.created_at.desc()).all()
+
+
+# ⚠️ MUST come before /{draft_id} to avoid FastAPI matching "history" as int
+@router.get("/history", response_model=list[DraftHistoryItem])
+def get_history(db: Session = Depends(get_db)):
+    drafts = (
+        db.query(MessageDraft)
+        .options(joinedload(MessageDraft.contact), joinedload(MessageDraft.occasion))
+        .filter(MessageDraft.status == "sent")
+        .order_by(MessageDraft.sent_at.desc())
+        .all()
+    )
+    return drafts
 
 
 @router.get("/{draft_id}", response_model=MessageDraftOut)
@@ -60,10 +73,8 @@ async def regenerate_draft(draft_id: int, db: Session = Depends(get_db)):
     draft = db.query(MessageDraft).filter(MessageDraft.id == draft_id).first()
     if not draft:
         raise HTTPException(status_code=404, detail="Draft not found")
-    if draft.status == "sent":
-        raise HTTPException(status_code=400, detail="Cannot regenerate a sent draft")
 
-    new_text, prompt = await generate_message(draft.contact, draft.occasion, draft.occasion_date)
+    new_text, prompt = await generate_message(draft.contact, draft.occasion, draft.occasion_date, db=db)
     draft.generated_text = new_text
     draft.edited_text = None
     draft.generation_prompt = prompt
@@ -100,7 +111,12 @@ async def send_draft(draft_id: int, body: DraftSendRequest, db: Session = Depend
         target_id = None
 
     final_text = draft.edited_text or draft.generated_text
-    await send_whatsapp_message(chat_id, final_text)
+
+    if body.gif_url:
+        await send_whatsapp_gif(chat_id, body.gif_url, final_text)
+        draft.gif_url = body.gif_url
+    else:
+        await send_whatsapp_message(chat_id, final_text)
 
     draft.whatsapp_target_id = target_id
     draft.final_text = final_text

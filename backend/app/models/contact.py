@@ -19,6 +19,7 @@ class Contact(Base):
     language: Mapped[str] = mapped_column(String(10), nullable=False, default="en")
     message_length: Mapped[str] = mapped_column(String(10), nullable=False, default="medium")
     custom_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    relationship_label: Mapped[str | None] = mapped_column(String(100), nullable=True)
     whatsapp_chat_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     whatsapp_chat_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
@@ -30,5 +31,5 @@ class Contact(Base):
         "Occasion", back_populates="contact", cascade="all, delete-orphan"
     )
     drafts: Mapped[list["MessageDraft"]] = sa_relationship(  # noqa: F821
-        "MessageDraft", back_populates="contact"
+        "MessageDraft", back_populates="contact", cascade="all, delete-orphan"
     )

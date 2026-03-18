@@ -46,7 +46,7 @@ async def daily_occasion_check(db: Session | None = None) -> int:
                 continue  # keep approved/sent/skipped drafts untouched
 
             try:
-                text, prompt = await generate_message(occ.contact, occ, today)
+                text, prompt = await generate_message(occ.contact, occ, today, db=db)
             except Exception as e:
                 logger.exception("Claude generation failed for occasion %d", occ.id)
                 raise RuntimeError(str(e)) from e
@@ -68,6 +68,14 @@ async def daily_occasion_check(db: Session | None = None) -> int:
 
         db.commit()
         logger.info("daily_occasion_check: %d drafts created for %s", created, today)
+
+        # Send admin notification (best-effort)
+        try:
+            from app.services.admin_wa_service import send_admin_notification
+            await send_admin_notification(db, occasions, today)
+        except Exception:
+            logger.exception("Failed to send admin WA notification")
+
         return created
     finally:
         if own_session:

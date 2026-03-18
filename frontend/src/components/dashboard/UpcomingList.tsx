@@ -1,3 +1,11 @@
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import type { DashboardUpcomingItem } from '../../types';
 
 const MONTHS = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -10,31 +18,36 @@ function occasionLabel(item: DashboardUpcomingItem) {
 }
 
 export default function UpcomingList({ items }: { items: DashboardUpcomingItem[] }) {
-  if (!items.length) return <p style={{ color: '#9ca3af', fontSize: 14 }}>No upcoming occasions in the next 7 days.</p>;
+  if (!items.length) {
+    return <p className="text-muted-foreground text-sm">No upcoming occasions in the next 7 days.</p>;
+  }
 
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-      <thead>
-        <tr style={{ borderBottom: '2px solid #e5e7eb', textAlign: 'left' }}>
-          <th style={th}>Date</th>
-          <th style={th}>Contact</th>
-          <th style={th}>Occasion</th>
-          <th style={th}>In</th>
-        </tr>
-      </thead>
-      <tbody>
-        {items.map((item) => (
-          <tr key={`${item.occasion.id}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
-            <td style={td}>{MONTHS[item.occasion.month]} {item.occasion.day}</td>
-            <td style={td}><strong>{item.contact.name}</strong></td>
-            <td style={td}>{occasionLabel(item)}</td>
-            <td style={td}>{item.days_away === 1 ? 'Tomorrow' : `${item.days_away} days`}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Date</TableHead>
+            <TableHead>Contact</TableHead>
+            <TableHead>Occasion</TableHead>
+            <TableHead>In</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.map((item) => (
+            <TableRow key={item.occasion.id}>
+              <TableCell className="text-muted-foreground">
+                {MONTHS[item.occasion.month]} {item.occasion.day}
+              </TableCell>
+              <TableCell className="font-medium">{item.contact.name}</TableCell>
+              <TableCell>{occasionLabel(item)}</TableCell>
+              <TableCell className="text-muted-foreground">
+                {item.days_away === 1 ? 'Tomorrow' : `${item.days_away} days`}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
-
-const th: React.CSSProperties = { padding: '8px 12px', fontWeight: 600, color: '#374151' };
-const td: React.CSSProperties = { padding: '10px 12px', color: '#4b5563' };

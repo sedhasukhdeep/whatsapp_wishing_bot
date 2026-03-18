@@ -30,6 +30,7 @@ npm install
 # Frontend
 cd frontend
 npm install
+cp .env.example .env        # sets VITE_API_URL=http://localhost:8000 (auto-created by start.sh)
 ```
 
 ### Running the app (local dev)
@@ -37,6 +38,7 @@ npm install
 ```bash
 # One command — starts backend, bridge, and frontend
 ./start.sh
+# start.sh checks for backend/.env, auto-creates frontend/.env if missing, runs migrations, then starts all three services
 ```
 
 Or manually:
@@ -44,12 +46,12 @@ Or manually:
 # Terminal 1 — backend
 cd backend && source .venv/bin/activate
 alembic upgrade head
-uvicorn app.main:app --reload --reload-dir app
+uvicorn app.main:app --reload --reload-dir app --port 8000
 
 # Terminal 2 — WhatsApp bridge
 cd whatsapp-bridge && npm start
 
-# Terminal 3 — frontend (needs frontend/.env with VITE_API_URL=http://localhost:8000)
+# Terminal 3 — frontend
 cd frontend && npm run dev
 ```
 
@@ -59,7 +61,7 @@ Open http://localhost:5173. Go to **WhatsApp** in the sidebar and scan the QR co
 
 ```bash
 # 1. Create root .env from template
-cp .env.example .env     # fill in ANTHROPIC_API_KEY
+cp .env.example .env     # fill in ANTHROPIC_API_KEY (also has SCHEDULER_TIMEZONE, SCHEDULER_HOUR, SCHEDULER_MINUTE, AI_PROVIDER)
 
 # 2. Build and start all containers
 docker-compose up --build
@@ -136,15 +138,18 @@ SQLite at `backend/wishing_bot.db`. Key constraint: `(occasion_id, occasion_date
 | `FRONTEND_ORIGIN` | Allowed CORS origin (default: `http://localhost:5173`; set to `http://localhost` in Docker) |
 | `SCHEDULER_TIMEZONE` | Cron timezone (default: `Asia/Kolkata`) |
 | `SCHEDULER_HOUR` | Hour for daily draft generation (default: `8`) |
+| `SCHEDULER_MINUTE` | Minute for daily draft generation (default: `0`) |
 | `DB_URL` | SQLAlchemy DB URL (default: SQLite at `./wishing_bot.db`; Docker uses `/app/data/wishing_bot.db`) |
-| `AI_PROVIDER` | `auto` / `claude` / `local` (default: `auto`) |
+| `AI_PROVIDER` | `auto` / `claude` / `local` (default: `auto` locally, `claude` in Docker) |
 | `LOCAL_AI_URL` | LM Studio / Ollama base URL (default: `http://localhost:1234/v1`) |
+| `LOCAL_AI_MODEL` | Specific local model name (optional; auto-detects first available if blank) |
 
 ### Frontend env (frontend/.env — dev only, gitignored)
 
 | Variable | Purpose |
 |---|---|
 | `VITE_API_URL` | Backend URL — set to `http://localhost:8000` for dev; empty in Docker (nginx proxies) |
+| `VITE_GIPHY_API_KEY` | Giphy API key for GIF picker (optional; get a free key at developers.giphy.com) |
 
 ### Docker networking
 

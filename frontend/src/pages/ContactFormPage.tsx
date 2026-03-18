@@ -4,6 +4,27 @@ import { createContact, deleteOccasion, getContact, updateContact } from '../api
 import ChatPicker from '../components/contacts/ChatPicker';
 import OccasionForm from '../components/contacts/OccasionForm';
 import type { ContactWithOccasions, LengthType, Occasion, RelationshipType, ToneType } from '../types';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { ArrowLeft, Plus } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const LANGUAGES = [
   { code: 'en', label: 'English' },
@@ -31,6 +52,7 @@ export default function ContactFormPage() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [relationship, setRelationship] = useState<RelationshipType>('friend');
+  const [relationshipLabel, setRelationshipLabel] = useState('');
   const [notes, setNotes] = useState('');
   const [tone, setTone] = useState<ToneType>('warm');
   const [language, setLanguage] = useState('en');
@@ -49,12 +71,12 @@ export default function ContactFormPage() {
     if (isEdit) {
       getContact(Number(id)).then((c: ContactWithOccasions) => {
         setName(c.name); setPhone(c.phone); setRelationship(c.relationship);
+        setRelationshipLabel(c.relationship_label ?? '');
         setNotes(c.notes ?? ''); setTone(c.tone_preference); setLanguage(c.language);
         setLength(c.message_length); setCustomInstructions(c.custom_instructions ?? '');
         setWhatsappChatId(c.whatsapp_chat_id);
         setWhatsappChatName(c.whatsapp_chat_name);
         setOccasions(c.occasions);
-        // Auto-switch to advanced if non-default values exist
         if (c.language !== 'en' || c.message_length !== 'medium' || c.custom_instructions) {
           setAdvancedMode(true);
         }
@@ -69,6 +91,7 @@ export default function ContactFormPage() {
     try {
       const data = {
         name, phone, relationship,
+        relationship_label: (relationship === 'other' && relationshipLabel) ? relationshipLabel : null,
         notes: notes || null,
         tone_preference: tone,
         language,
@@ -96,187 +119,258 @@ export default function ContactFormPage() {
   }
 
   return (
-    <div style={page}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button type="button" onClick={() => nav('/contacts')} style={backBtn}>← Back</button>
-        <h1 style={heading}>{isEdit ? 'Edit Contact' : 'Add Contact'}</h1>
+    <div className="p-8 max-w-2xl mx-auto">
+      <div className="flex items-center gap-3 mb-6">
+        <Button variant="ghost" size="sm" onClick={() => nav('/contacts')} className="gap-1">
+          <ArrowLeft size={16} />
+          Back
+        </Button>
+        <h1 className="text-xl font-bold">{isEdit ? 'Edit Contact' : 'Add Contact'}</h1>
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="space-y-4">
         {/* Basic Info */}
-        <section style={section}>
-          <h2 style={sectionTitle}>Basic Info</h2>
-
-          <label style={lbl}>Name *</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} required style={input} placeholder="e.g. Priya Sharma" />
-
-          <label style={lbl}>Phone * (international format)</label>
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} required style={input} placeholder="+919876543210" />
-
-          <label style={lbl}>Relationship</label>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
-            {(['family', 'friend', 'colleague', 'acquaintance', 'other'] as RelationshipType[]).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRelationship(r)}
-                style={{ ...chipBtn, background: relationship === r ? '#2563eb' : '#f3f4f6', color: relationship === r ? '#fff' : '#374151' }}
-              >
-                {r.charAt(0).toUpperCase() + r.slice(1)}
-              </button>
-            ))}
-          </div>
-
-          <label style={lbl}>Personal Notes (used by AI to personalize messages)</label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={3}
-            style={{ ...input, resize: 'vertical' }}
-            placeholder="e.g. loves cricket, has two kids named Arjun and Priya, big Arsenal fan..."
-          />
-        </section>
-
-        {/* WhatsApp Chat */}
-        <section style={section}>
-          <h2 style={sectionTitle}>WhatsApp Chat</h2>
-          <p style={hint}>Link this contact to a WhatsApp chat so messages can be sent with one click.</p>
-          <ChatPicker
-            chatId={whatsappChatId}
-            chatName={whatsappChatName}
-            onChange={(cid, cname) => { setWhatsappChatId(cid); setWhatsappChatName(cname); }}
-          />
-        </section>
-
-        {/* Message Preferences */}
-        <section style={section}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <h2 style={{ ...sectionTitle, margin: 0 }}>Message Preferences</h2>
-            <div style={{ display: 'flex', gap: 0, border: '1px solid #d1d5db', borderRadius: 6, overflow: 'hidden' }}>
-              <button
-                type="button"
-                onClick={() => setAdvancedMode(false)}
-                style={{ ...modeBtn, background: !advancedMode ? '#2563eb' : '#fff', color: !advancedMode ? '#fff' : '#374151' }}
-              >
-                Simple
-              </button>
-              <button
-                type="button"
-                onClick={() => setAdvancedMode(true)}
-                style={{ ...modeBtn, background: advancedMode ? '#2563eb' : '#fff', color: advancedMode ? '#fff' : '#374151' }}
-              >
-                Advanced
-              </button>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">Basic Info</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">Name *</label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} required placeholder="e.g. Priya Sharma" />
             </div>
-          </div>
-
-          <label style={lbl}>Tone</label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginTop: 4 }}>
-            {TONES.map((t) => (
-              <button
-                key={t.value}
-                type="button"
-                onClick={() => setTone(t.value)}
-                style={{
-                  ...toneCard,
-                  border: tone === t.value ? '2px solid #2563eb' : '1px solid #e5e7eb',
-                  background: tone === t.value ? '#eff6ff' : '#fff',
-                }}
-              >
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 3 }}>{t.label}</div>
-                <div style={{ fontSize: 11, color: '#6b7280' }}>{t.desc}</div>
-              </button>
-            ))}
-          </div>
-
-          {advancedMode && (
-            <>
-              <label style={lbl}>Language</label>
-              <select value={language} onChange={(e) => setLanguage(e.target.value)} style={input}>
-                {LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
-              </select>
-
-              <label style={lbl}>Message Length</label>
-              <div style={{ display: 'flex', gap: 10 }}>
-                {(['short', 'medium', 'long'] as LengthType[]).map((l) => (
-                  <label key={l} style={{ fontSize: 14, display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
-                    <input type="radio" checked={length === l} onChange={() => setLength(l)} />
-                    {l.charAt(0).toUpperCase() + l.slice(1)}
-                  </label>
+            <div>
+              <label className="block text-sm font-medium mb-1">Phone * (international format)</label>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} required placeholder="+919876543210" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Relationship</label>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {(['family', 'friend', 'colleague', 'acquaintance', 'other'] as RelationshipType[]).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setRelationship(r)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-full text-sm font-medium border transition-colors',
+                      relationship === r
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-background border-border text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    {r.charAt(0).toUpperCase() + r.slice(1)}
+                  </button>
                 ))}
               </div>
-
-              <label style={lbl}>Custom AI Instructions (optional)</label>
-              <textarea
-                value={customInstructions}
-                onChange={(e) => setCustomInstructions(e.target.value)}
-                rows={2}
-                style={{ ...input, resize: 'vertical' }}
-                placeholder="e.g. Always end with a Punjabi phrase. Mention their pet dog Bruno."
-              />
-            </>
-          )}
-        </section>
-
-        {/* Occasions — only available after contact is created */}
-        {isEdit && (
-          <section style={section}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h2 style={{ ...sectionTitle, margin: 0 }}>Occasions</h2>
-              <button
-                type="button"
-                onClick={() => { setEditingOccasion(undefined); setShowOccasionForm(true); }}
-                style={btnAdd}
-              >
-                + Add Occasion
-              </button>
-            </div>
-            {occasions.length === 0
-              ? <p style={{ color: '#9ca3af', fontSize: 14 }}>No occasions yet.</p>
-              : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-                  <thead>
-                    <tr style={{ borderBottom: '2px solid #e5e7eb', textAlign: 'left' }}>
-                      <th style={th}>Type</th>
-                      <th style={th}>Date</th>
-                      <th style={th}>Year</th>
-                      <th style={th}>Active</th>
-                      <th style={th}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {occasions.map((occ) => (
-                      <tr key={occ.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                        <td style={td}>{occ.label || occ.type}</td>
-                        <td style={td}>{MONTHS[occ.month]} {occ.day}</td>
-                        <td style={td}>{occ.year ?? '—'}</td>
-                        <td style={td}>{occ.active ? 'Yes' : 'No'}</td>
-                        <td style={td}>
-                          <button type="button" onClick={() => { setEditingOccasion(occ); setShowOccasionForm(true); }} style={btnEditSm}>Edit</button>
-                          {' '}
-                          <button type="button" onClick={() => handleDeleteOccasion(occ)} style={btnDeleteSm}>Del</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              {relationship === 'other' && (
+                <div className="mt-2">
+                  <Input
+                    value={relationshipLabel}
+                    onChange={(e) => setRelationshipLabel(e.target.value)}
+                    placeholder="e.g. Mentor, Neighbour, Gym buddy..."
+                    className="mt-1"
+                  />
+                </div>
               )}
-          </section>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Personal Notes</label>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                placeholder="e.g. loves cricket, has two kids named Arjun and Priya, big Arsenal fan..."
+                className="resize-y"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* WhatsApp Chat */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">WhatsApp Chat</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">
+              Link this contact to a WhatsApp chat for one-click sending.
+            </p>
+            <ChatPicker
+              chatId={whatsappChatId}
+              chatName={whatsappChatName}
+              onChange={(cid, cname) => { setWhatsappChatId(cid); setWhatsappChatName(cname); }}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Message Preferences */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold">Message Preferences</CardTitle>
+              <div className="flex rounded-md border overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setAdvancedMode(false)}
+                  className={cn(
+                    'px-3 py-1 text-xs font-medium border-0 cursor-pointer transition-colors',
+                    !advancedMode ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  Simple
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdvancedMode(true)}
+                  className={cn(
+                    'px-3 py-1 text-xs font-medium border-0 cursor-pointer transition-colors',
+                    advancedMode ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  Advanced
+                </button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium mb-2">Tone</label>
+              <div className="grid grid-cols-3 gap-2">
+                {TONES.map((t) => (
+                  <button
+                    key={t.value}
+                    type="button"
+                    onClick={() => setTone(t.value)}
+                    className={cn(
+                      'p-3 rounded-lg border text-left cursor-pointer transition-colors',
+                      tone === t.value
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border bg-background hover:bg-accent'
+                    )}
+                  >
+                    <div className="font-semibold text-xs mb-0.5">{t.label}</div>
+                    <div className="text-xs text-muted-foreground">{t.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {advancedMode && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Language</label>
+                  <Select value={language} onValueChange={setLanguage}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LANGUAGES.map((l) => (
+                        <SelectItem key={l.code} value={l.code}>{l.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Message Length</label>
+                  <div className="flex gap-4">
+                    {(['short', 'medium', 'long'] as LengthType[]).map((l) => (
+                      <label key={l} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="radio" checked={length === l} onChange={() => setLength(l)} />
+                        {l.charAt(0).toUpperCase() + l.slice(1)}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Custom AI Instructions</label>
+                  <Textarea
+                    value={customInstructions}
+                    onChange={(e) => setCustomInstructions(e.target.value)}
+                    rows={2}
+                    placeholder="e.g. Always end with a Punjabi phrase. Mention their pet dog Bruno."
+                    className="resize-y"
+                  />
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Occasions */}
+        {isEdit && (
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold">Occasions</CardTitle>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setEditingOccasion(undefined); setShowOccasionForm(true); }}
+                  className="gap-1"
+                >
+                  <Plus size={14} />
+                  Add Occasion
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {occasions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No occasions yet.</p>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Year</TableHead>
+                        <TableHead>Active</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {occasions.map((occ) => (
+                        <TableRow key={occ.id}>
+                          <TableCell className="font-medium">{occ.label || occ.type}</TableCell>
+                          <TableCell>{MONTHS[occ.month]} {occ.day}</TableCell>
+                          <TableCell>{occ.year ?? '—'}</TableCell>
+                          <TableCell>{occ.active ? 'Yes' : 'No'}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button type="button" variant="ghost" size="sm" className="h-7 text-xs"
+                                onClick={() => { setEditingOccasion(occ); setShowOccasionForm(true); }}>
+                                Edit
+                              </Button>
+                              <Button type="button" variant="ghost" size="sm" className="h-7 text-xs text-destructive"
+                                onClick={() => handleDeleteOccasion(occ)}>
+                                Del
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {!isEdit && (
-          <div style={{ ...section, background: '#f0f9ff', borderColor: '#bae6fd' }}>
-            <p style={{ margin: 0, fontSize: 13, color: '#0369a1' }}>
-              Save the contact first, then you can add their occasions (birthdays, anniversaries, etc.) from the edit screen.
+          <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 p-4">
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              Save the contact first, then add occasions from the edit screen.
             </p>
           </div>
         )}
 
-        {error && <p style={{ color: '#ef4444', fontSize: 13 }}>{error}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-          <button type="button" onClick={() => nav('/contacts')} style={btnCancel}>Cancel</button>
-          <button type="submit" disabled={saving} style={btnSave}>{saving ? 'Saving...' : 'Save Contact'}</button>
+        <div className="flex gap-3">
+          <Button type="button" variant="outline" onClick={() => nav('/contacts')}>Cancel</Button>
+          <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Contact'}</Button>
         </div>
       </form>
 
@@ -297,22 +391,3 @@ export default function ContactFormPage() {
     </div>
   );
 }
-
-const page: React.CSSProperties = { padding: 32, maxWidth: 700, margin: '0 auto' };
-const heading: React.CSSProperties = { fontSize: 22, fontWeight: 700, margin: 0, color: '#111827' };
-const section: React.CSSProperties = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 20, marginBottom: 20 };
-const sectionTitle: React.CSSProperties = { fontSize: 15, fontWeight: 600, margin: '0 0 12px', color: '#374151' };
-const lbl: React.CSSProperties = { display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4, marginTop: 12, color: '#374151' };
-const hint: React.CSSProperties = { margin: '0 0 10px', fontSize: 13, color: '#6b7280' };
-const input: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 };
-const chipBtn: React.CSSProperties = { padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500 };
-const modeBtn: React.CSSProperties = { padding: '6px 14px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500 };
-const toneCard: React.CSSProperties = { padding: '10px 12px', borderRadius: 8, cursor: 'pointer', textAlign: 'left', transition: 'all 0.1s' };
-const th: React.CSSProperties = { padding: '8px 10px', fontWeight: 600 };
-const td: React.CSSProperties = { padding: '8px 10px' };
-const btnAdd: React.CSSProperties = { padding: '6px 12px', borderRadius: 6, border: '1px solid #2563eb', color: '#2563eb', background: '#fff', cursor: 'pointer', fontSize: 13 };
-const btnEditSm: React.CSSProperties = { padding: '3px 8px', fontSize: 12, border: '1px solid #d1d5db', borderRadius: 4, cursor: 'pointer', background: '#fff' };
-const btnDeleteSm: React.CSSProperties = { padding: '3px 8px', fontSize: 12, border: 'none', borderRadius: 4, cursor: 'pointer', background: '#fee2e2', color: '#dc2626' };
-const backBtn: React.CSSProperties = { padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontSize: 13, color: '#6b7280' };
-const btnCancel: React.CSSProperties = { padding: '10px 18px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' };
-const btnSave: React.CSSProperties = { padding: '10px 18px', borderRadius: 6, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 500 };

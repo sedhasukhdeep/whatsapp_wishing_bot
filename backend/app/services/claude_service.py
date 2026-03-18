@@ -1,20 +1,21 @@
 """
 AI message generation service.
 Supports Claude (Anthropic) and any OpenAI-compatible local model (LM Studio, Ollama).
-Provider selection via AI_PROVIDER env var: "auto" | "claude" | "local"
+Provider selection via AI_PROVIDER env var or DB admin settings: "auto" | "claude" | "local"
   auto  — tries local first (2s timeout), falls back to Claude
   local — local only (error if unavailable)
   claude — Claude only
 """
 
 import logging
+import re
 from datetime import date
 
 import anthropic
 import httpx
 from openai import AsyncOpenAI
 
-from app.config import settings
+from app.config import settings as env_settings
 from app.models.contact import Contact
 from app.models.occasion import Occasion
 from app.services.occasion_service import build_occasion_display
@@ -22,13 +23,36 @@ from app.services.occasion_service import build_occasion_display
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (
-    "You are a warm, thoughtful assistant who writes personal greeting messages for WhatsApp. "
-    "Your messages should feel genuine and human — never generic or copy-paste sounding. "
-    "Write ONLY the message text itself with no preamble, no subject line, no sign-off label. "
-    "Do not include 'Message:' or quotes around the output."
+    "You write WhatsApp greeting messages. "
+    "Your entire response IS the message — output nothing else. "
+    "No preamble, no labels, no analysis, no drafts, no word counts. "
+    "Start writing the message immediately."
 )
 
 LENGTH_GUIDE = {"short": "~30 words", "medium": "~60 words", "long": "~100 words"}
+
+DEFAULT_CLAUDE_MODEL = "claude-3-5-haiku-20241022"
+
+
+def _get_effective_settings(db=None) -> dict:
+    """Returns AI settings from DB (if db provided), falling back to env vars."""
+    if db is not None:
+        from app.models.admin_setting import AdminSetting
+        rows = {r.key: r.value for r in db.query(AdminSetting).all() if r.value}
+        return {
+            "ai_provider": rows.get("ai_provider") or env_settings.ai_provider,
+            "anthropic_api_key": rows.get("anthropic_api_key") or env_settings.anthropic_api_key,
+            "claude_model": rows.get("claude_model") or DEFAULT_CLAUDE_MODEL,
+            "local_ai_url": rows.get("local_ai_url") or env_settings.local_ai_url,
+            "local_ai_model": rows.get("local_ai_model") or env_settings.local_ai_model,
+        }
+    return {
+        "ai_provider": env_settings.ai_provider,
+        "anthropic_api_key": env_settings.anthropic_api_key,
+        "claude_model": DEFAULT_CLAUDE_MODEL,
+        "local_ai_url": env_settings.local_ai_url,
+        "local_ai_model": env_settings.local_ai_model,
+    }
 
 
 def _build_prompt(contact: Contact, occasion: Occasion, on_date: date) -> str:
@@ -42,113 +66,201 @@ def _build_prompt(contact: Contact, occasion: Occasion, on_date: date) -> str:
 
     length_hint = LENGTH_GUIDE.get(length, "~60 words")
 
-    lines = [
-        "Write a WhatsApp greeting message with these parameters:",
-        "",
-        f"Recipient: {contact.name}",
-        f"Relationship to sender: {contact.relationship}",
-        f"Occasion: {occasion_display}",
-        f"Tone: {tone}",
-        f"Language: {language}",
-        f"Length: {length} ({length_hint})",
+    parts = [
+        f"Write a {tone} {occasion_display} WhatsApp message for {contact.name} ({contact.relationship}).",
+        f"Language: {language}. Length: {length_hint}.",
     ]
     if contact.notes:
-        lines += ["", f"Personal notes about {contact.name}: {contact.notes}",
-                  "Use these details to make the message more personal."]
+        parts.append(f"Personal details to weave in: {contact.notes}.")
     if instructions:
-        lines += ["", f"Additional instructions: {instructions}"]
+        parts.append(instructions)
 
-    return "\n".join(lines)
+    return " ".join(parts)
 
 
-async def _detect_local_model() -> str | None:
+async def _detect_local_model(local_ai_url: str, local_ai_model: str) -> str | None:
     """Returns model name if a local AI is reachable, else None."""
     try:
         async with httpx.AsyncClient(timeout=2.0) as client:
             resp = await client.get(
-                f"{settings.local_ai_url}/models",
+                f"{local_ai_url}/models",
                 headers={"Authorization": "Bearer not-needed"},
             )
             if resp.status_code == 200:
                 models = resp.json().get("data", [])
                 if models:
-                    if settings.local_ai_model:
-                        return settings.local_ai_model
+                    if local_ai_model:
+                        return local_ai_model
                     return models[0]["id"]
     except Exception:
         pass
     return None
 
 
-async def _generate_local(prompt: str, model: str) -> str:
-    client = AsyncOpenAI(base_url=settings.local_ai_url, api_key="not-needed")
+async def _generate_local(prompt: str, model: str, local_ai_url: str) -> str:
+    client = AsyncOpenAI(base_url=local_ai_url, api_key="not-needed")
     response = await client.chat.completions.create(
         model=model,
-        max_tokens=300,
+        max_tokens=800,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ],
+        # Disable thinking mode for Qwen3 and compatible models.
+        # LM Studio accepts enable_thinking at the top level; Ollama via chat_template_kwargs.
+        extra_body={"enable_thinking": False, "chat_template_kwargs": {"enable_thinking": False}},
     )
-    return response.choices[0].message.content.strip()
+    text = response.choices[0].message.content.strip()
+    return _extract_clean_message(text)
 
 
-async def _generate_claude(prompt: str) -> str:
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key, timeout=30.0)
+# Strips <think>/<thinking> blocks used by local reasoning models (Qwen3, DeepSeek-R1, etc.)
+_THINKING_TAG_RE = re.compile(r"<think(?:ing)?>.*?</think(?:ing)?>\s*", re.DOTALL | re.IGNORECASE)
+
+# Detects verbose thinking output (e.g. "Thinking Process:", "1. **Analyze...")
+_VERBOSE_THINKING_RE = re.compile(r"thinking\s*process\s*:", re.IGNORECASE)
+
+# Analysis line markers that signal end of message content
+_ANALYSIS_SPLIT_RE = re.compile(
+    r"\n\s*\*?(?:Word Count|Tone Check|Constraint|Count:)", re.IGNORECASE
+)
+
+# Inline draft block: "*Draft N:*\n   <message>"
+_INLINE_DRAFT_RE = re.compile(
+    r"\*Draft\s*\d+:\*\s*\n\s*(.*?)(?=\n\s*\*(?:Draft\s*\d|Word Count|Tone|Constraint)|\n\s*\d+\.\s|\Z)",
+    re.DOTALL | re.IGNORECASE,
+)
+
+# Top-level "Drafting..." section
+_DRAFTING_SECTION_RE = re.compile(
+    r"\*{0,2}(?:Drafting|Draft\s*\d+)[^:]*:\*{0,2}[ \t]*\n(.*?)(?=\n[ \t]*\d+\.[ \t]|\Z)",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def _extract_clean_message(text: str) -> str:
+    """Strip or extract the actual message from verbose thinking output."""
+    # Remove XML-style thinking blocks first
+    text = _THINKING_TAG_RE.sub("", text).strip()
+
+    if not _VERBOSE_THINKING_RE.search(text):
+        return text
+
+    # 1. Look for an inline "*Draft N:*\n<message>" block anywhere in the text
+    for m in _INLINE_DRAFT_RE.finditer(text):
+        content = _ANALYSIS_SPLIT_RE.split(m.group(1))[0].strip()
+        if len(content.split()) >= 10:
+            return content
+
+    # 2. Fallback: grab the Drafting section content and strip leading bullets
+    for m in _DRAFTING_SECTION_RE.finditer(text):
+        section = m.group(1)
+        # Remove leading bullet/planning lines and keep only prose paragraphs
+        paragraphs = re.split(r"\n{2,}", section)
+        for para in paragraphs:
+            para = para.strip()
+            if para and not para.startswith("*") and len(para.split()) >= 10:
+                return _ANALYSIS_SPLIT_RE.split(para)[0].strip()
+
+    return text
+
+
+async def _generate_claude(prompt: str, api_key: str, claude_model: str) -> str:
+    client = anthropic.AsyncAnthropic(api_key=api_key, timeout=300.0)
     response = await client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=300,
+        model=claude_model,
+        max_tokens=1024,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": prompt}],
     )
-    return response.content[0].text.strip()
+    text_block = next(b for b in response.content if b.type == "text")
+    return _extract_clean_message(text_block.text)
 
 
-async def generate_message(contact: Contact, occasion: Occasion, on_date: date) -> tuple[str, str]:
+async def generate_message(
+    contact: Contact, occasion: Occasion, on_date: date, db=None
+) -> tuple[str, str]:
     """Returns (generated_text, prompt_used)."""
+    ai = _get_effective_settings(db)
     prompt = _build_prompt(contact, occasion, on_date)
-    provider = settings.ai_provider
+    provider = ai["ai_provider"]
 
     if provider == "local":
-        model = await _detect_local_model()
+        model = await _detect_local_model(ai["local_ai_url"], ai["local_ai_model"])
         if not model:
             raise RuntimeError("Local AI provider configured but no local model is available. "
                                "Start LM Studio or Ollama and load a model.")
         logger.info("Using local AI model: %s", model)
-        text = await _generate_local(prompt, model)
+        text = await _generate_local(prompt, model, ai["local_ai_url"])
         return text, prompt
 
     if provider == "claude":
-        text = await _generate_claude(prompt)
+        text = await _generate_claude(prompt, ai["anthropic_api_key"], ai["claude_model"])
         return text, prompt
 
     # auto: try local first, fall back to Claude
-    model = await _detect_local_model()
+    model = await _detect_local_model(ai["local_ai_url"], ai["local_ai_model"])
     if model:
         try:
             logger.info("Auto: using local AI model: %s", model)
-            text = await _generate_local(prompt, model)
+            text = await _generate_local(prompt, model, ai["local_ai_url"])
             return text, prompt
         except Exception as e:
             logger.warning("Local AI failed (%s), falling back to Claude", e)
 
     logger.info("Auto: using Claude")
-    text = await _generate_claude(prompt)
+    text = await _generate_claude(prompt, ai["anthropic_api_key"], ai["claude_model"])
     return text, prompt
 
 
-async def get_ai_status() -> dict:
+async def generate_broadcast_message(occasion_name: str, db=None) -> tuple[str, str]:
+    """Generate a broadcast message for a given occasion. Returns (text, prompt)."""
+    ai = _get_effective_settings(db)
+    prompt = (
+        f"Write a warm, friendly WhatsApp message for {occasion_name}. "
+        "This message will be sent to multiple people. "
+        "Keep it general (no specific personal details). "
+        "Language: English. Length: ~60 words."
+    )
+    provider = ai["ai_provider"]
+
+    if provider == "local":
+        model = await _detect_local_model(ai["local_ai_url"], ai["local_ai_model"])
+        if not model:
+            raise RuntimeError("Local AI unavailable")
+        text = await _generate_local(prompt, model, ai["local_ai_url"])
+        return text, prompt
+
+    if provider == "claude":
+        text = await _generate_claude(prompt, ai["anthropic_api_key"], ai["claude_model"])
+        return text, prompt
+
+    model = await _detect_local_model(ai["local_ai_url"], ai["local_ai_model"])
+    if model:
+        try:
+            text = await _generate_local(prompt, model, ai["local_ai_url"])
+            return text, prompt
+        except Exception as e:
+            logger.warning("Local AI failed for broadcast (%s), falling back to Claude", e)
+
+    text = await _generate_claude(prompt, ai["anthropic_api_key"], ai["claude_model"])
+    return text, prompt
+
+
+async def get_ai_status(db=None) -> dict:
     """Returns current AI provider status for the frontend."""
-    local_model = await _detect_local_model()
+    ai = _get_effective_settings(db)
+    local_model = await _detect_local_model(ai["local_ai_url"], ai["local_ai_model"])
     return {
-        "provider_setting": settings.ai_provider,
+        "provider_setting": ai["ai_provider"],
         "local_available": local_model is not None,
         "local_model": local_model,
-        "local_url": settings.local_ai_url,
-        "claude_configured": bool(settings.anthropic_api_key),
+        "local_url": ai["local_ai_url"],
+        "claude_configured": bool(ai["anthropic_api_key"]),
         "active_provider": (
-            "local" if (settings.ai_provider == "local" or
-                        (settings.ai_provider == "auto" and local_model))
+            "local" if (ai["ai_provider"] == "local" or
+                        (ai["ai_provider"] == "auto" and local_model))
             else "claude"
         ),
+        "claude_model": ai["claude_model"],
     }

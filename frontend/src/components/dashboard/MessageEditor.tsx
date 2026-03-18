@@ -1,3 +1,8 @@
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { RefreshCw } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
 const WA_WARN = 3800;
 const WA_LIMIT = 4096;
 
@@ -13,40 +18,38 @@ export default function MessageEditor({ value, onChange, onRegenerate, regenerat
   const overLimit = len > WA_LIMIT;
   const nearLimit = len > WA_WARN;
 
-  const counterColor = overLimit ? '#dc2626' : nearLimit ? '#d97706' : '#9ca3af';
-
   return (
-    <div style={{ marginBottom: 12 }}>
-      <textarea
+    <div className="space-y-1.5 mb-3">
+      <Textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={5}
-        style={{
-          width: '100%', boxSizing: 'border-box', padding: '10px 12px',
-          border: `1px solid ${overLimit ? '#fca5a5' : '#d1d5db'}`,
-          borderRadius: 6, fontSize: 14,
-          lineHeight: 1.5, resize: 'vertical', fontFamily: 'inherit',
-          outline: overLimit ? '2px solid #fca5a5' : undefined,
-        }}
+        className={cn(
+          'resize-y text-sm leading-relaxed',
+          overLimit && 'border-destructive focus-visible:ring-destructive'
+        )}
       />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-        <span style={{ fontSize: 12, color: counterColor }}>
+      <div className="flex items-center justify-between">
+        <span
+          className={cn(
+            'text-xs',
+            overLimit ? 'text-destructive' : nearLimit ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'
+          )}
+        >
           {len} / {WA_LIMIT} chars
-          {overLimit && ' — message exceeds WhatsApp limit'}
-          {!overLimit && nearLimit && ' — approaching WhatsApp limit'}
+          {overLimit && ' — exceeds WhatsApp limit'}
+          {!overLimit && nearLimit && ' — approaching limit'}
         </span>
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           onClick={onRegenerate}
           disabled={regenerating}
-          style={{
-            fontSize: 12, padding: '4px 10px', borderRadius: 4,
-            border: '1px solid #d1d5db', background: '#fff',
-            cursor: regenerating ? 'not-allowed' : 'pointer',
-            color: '#6b7280',
-          }}
+          className="h-7 text-xs gap-1"
         >
+          <RefreshCw size={12} className={regenerating ? 'animate-spin' : ''} />
           {regenerating ? 'Regenerating...' : 'Regenerate'}
-        </button>
+        </Button>
       </div>
     </div>
   );

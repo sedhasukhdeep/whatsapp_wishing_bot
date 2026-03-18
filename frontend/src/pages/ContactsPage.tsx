@@ -3,8 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { deleteContact, listContacts } from '../api/client';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import type { Contact, RelationshipType } from '../types';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Upload, UserPlus, Users } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const RELATIONSHIPS: RelationshipType[] = ['family', 'friend', 'colleague', 'acquaintance', 'other'];
+
+const REL_COLORS: Record<string, string> = {
+  family: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  friend: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  colleague: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+  acquaintance: 'bg-muted text-muted-foreground',
+  other: 'bg-muted text-muted-foreground',
+};
 
 export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -24,28 +38,40 @@ export default function ContactsPage() {
   }
 
   return (
-    <div style={page}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h1 style={heading}>Contacts</h1>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={() => nav('/contacts/import')} style={btnSecondary}>Import from Calendar</button>
-          <button onClick={() => nav('/contacts/new')} style={btnPrimary}>+ Add Contact</button>
+    <div className="p-8">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Contacts</h1>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => nav('/contacts/import')} className="gap-2">
+            <Upload size={16} />
+            Import Calendar
+          </Button>
+          <Button onClick={() => nav('/contacts/new')} className="gap-2">
+            <UserPlus size={16} />
+            Add Contact
+          </Button>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-        <input
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 mb-6">
+        <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name or phone..."
-          style={{ padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14, minWidth: 240 }}
+          className="w-64"
         />
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div className="flex flex-wrap gap-1.5">
           {['', ...RELATIONSHIPS].map((r) => (
             <button
               key={r}
               onClick={() => setRel(r)}
-              style={{ ...chipBtn, background: rel === r ? '#2563eb' : '#f3f4f6', color: rel === r ? '#fff' : '#374151' }}
+              className={cn(
+                'px-3 py-1 rounded-full text-sm font-medium border transition-colors',
+                rel === r
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-background border-border text-muted-foreground hover:text-foreground'
+              )}
             >
               {r || 'All'}
             </button>
@@ -54,36 +80,52 @@ export default function ContactsPage() {
       </div>
 
       {contacts.length === 0 ? (
-        <div style={emptyState}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>👤</div>
-          <p style={{ fontSize: 16, fontWeight: 500, margin: '0 0 6px' }}>No contacts yet</p>
-          <p style={{ fontSize: 14, color: '#6b7280', margin: '0 0 20px' }}>
-            Add contacts manually or import from your calendar.
-          </p>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-            <button onClick={() => nav('/contacts/import')} style={btnSecondary}>Import from Calendar</button>
-            <button onClick={() => nav('/contacts/new')} style={btnPrimary}>Add Contact</button>
-          </div>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-          {contacts.map((c) => (
-            <div key={c.id} style={card}>
-              <div style={{ fontWeight: 600, fontSize: 16 }}>{c.name}</div>
-              <div style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 8px' }}>
-                {c.phone} · <span style={relBadge(c.relationship)}>{c.relationship}</span>
-              </div>
-              {c.notes && <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 8, lineHeight: 1.4 }}>{c.notes}</div>}
-              {c.whatsapp_chat_id && (
-                <div style={{ fontSize: 12, color: '#059669', marginBottom: 8 }}>
-                  WhatsApp: {c.whatsapp_chat_name || c.whatsapp_chat_id}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                <button onClick={() => nav(`/contacts/${c.id}/edit`)} style={btnEdit}>Edit</button>
-                <button onClick={() => setConfirmDelete(c)} style={btnDelete}>Delete</button>
-              </div>
+        <Card>
+          <CardContent className="flex flex-col items-center py-16 text-center">
+            <Users size={48} className="text-muted-foreground mb-4" />
+            <h3 className="font-semibold text-lg mb-1">No contacts yet</h3>
+            <p className="text-muted-foreground text-sm mb-6">
+              Add contacts manually or import from your calendar.
+            </p>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => nav('/contacts/import')}>Import Calendar</Button>
+              <Button onClick={() => nav('/contacts/new')}>Add Contact</Button>
             </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+          {contacts.map((c) => (
+            <Card key={c.id} data-testid="contact-card" className="hover:shadow-sm transition-shadow">
+              <CardContent className="pt-4 pb-4">
+                <div className="font-semibold text-base">{c.name}</div>
+                <div className="text-sm text-muted-foreground mt-1 mb-2 flex items-center gap-2">
+                  {c.phone}
+                  <Badge className={cn('text-xs px-2 py-0.5 border-0', REL_COLORS[c.relationship] ?? REL_COLORS.other)}>
+                    {c.relationship_label || c.relationship}
+                  </Badge>
+                </div>
+                {c.notes && (
+                  <p className="text-xs text-muted-foreground mb-2 leading-snug line-clamp-2">{c.notes}</p>
+                )}
+                {c.whatsapp_chat_id && (
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-2">
+                    WhatsApp: {c.whatsapp_chat_name || c.whatsapp_chat_id}
+                  </p>
+                )}
+                <div className="flex gap-2 mt-3">
+                  <Button variant="outline" size="sm" onClick={() => nav(`/contacts/${c.id}/edit`)}>Edit</Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:bg-destructive/10"
+                    onClick={() => setConfirmDelete(c)}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
@@ -98,18 +140,3 @@ export default function ContactsPage() {
     </div>
   );
 }
-
-function relBadge(rel: string): React.CSSProperties {
-  const colors: Record<string, string> = { family: '#fef3c7', friend: '#dbeafe', colleague: '#f3e8ff', acquaintance: '#f3f4f6', other: '#f3f4f6' };
-  return { background: colors[rel] || '#f3f4f6', padding: '1px 7px', borderRadius: 10, fontSize: 11 };
-}
-
-const page: React.CSSProperties = { padding: 32 };
-const heading: React.CSSProperties = { fontSize: 24, fontWeight: 700, margin: 0, color: '#111827' };
-const btnPrimary: React.CSSProperties = { padding: '9px 16px', borderRadius: 6, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 14 };
-const btnSecondary: React.CSSProperties = { padding: '9px 16px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontSize: 14 };
-const card: React.CSSProperties = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 16 };
-const chipBtn: React.CSSProperties = { padding: '6px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13 };
-const btnEdit: React.CSSProperties = { padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontSize: 13 };
-const btnDelete: React.CSSProperties = { padding: '6px 12px', borderRadius: 6, border: 'none', background: '#fee2e2', color: '#dc2626', cursor: 'pointer', fontSize: 13 };
-const emptyState: React.CSSProperties = { textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: 8, border: '1px solid #e5e7eb' };

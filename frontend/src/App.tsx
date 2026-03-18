@@ -5,6 +5,11 @@ import ContactFormPage from './pages/ContactFormPage';
 import ContactsPage from './pages/ContactsPage';
 import DashboardPage from './pages/DashboardPage';
 import TargetsPage from './pages/TargetsPage';
+import HistoryPage from './pages/HistoryPage';
+import CalendarPage from './pages/CalendarPage';
+import BroadcastsPage from './pages/BroadcastsPage';
+import BroadcastDetailPage from './pages/BroadcastDetailPage';
+import SettingsPage from './pages/SettingsPage';
 
 export default function App() {
   return (
@@ -18,6 +23,11 @@ export default function App() {
           <Route path="/contacts/import" element={<CalendarImportPage />} />
           <Route path="/contacts/:id/edit" element={<ContactFormPage />} />
           <Route path="/targets" element={<TargetsPage />} />
+          <Route path="/history" element={<HistoryPage />} />
+          <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/broadcasts" element={<BroadcastsPage />} />
+          <Route path="/broadcasts/:id" element={<BroadcastDetailPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

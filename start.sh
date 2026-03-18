@@ -53,6 +53,11 @@ log "Backend ready."
 
 # ── whatsapp bridge ───────────────────────────────────────────────────────────
 log "Starting WhatsApp bridge (port 3001)..."
+# Remove stale Chromium lock files that a previous crash may have left behind
+rm -f "$ROOT/whatsapp-bridge/session/session/SingletonLock" \
+      "$ROOT/whatsapp-bridge/session/session/SingletonCookie" \
+      "$ROOT/whatsapp-bridge/session/session/SingletonSocket" \
+      "$ROOT/whatsapp-bridge/session/session/DevToolsActivePort"
 cd "$ROOT/whatsapp-bridge"
 node src/index.js &
 PIDS+=($!)

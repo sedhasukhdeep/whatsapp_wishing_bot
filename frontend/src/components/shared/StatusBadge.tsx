@@ -1,10 +1,11 @@
+import { Badge } from '@/components/ui/badge';
 import type { DraftStatus } from '../../types';
 
-const COLORS: Record<DraftStatus, string> = {
-  pending: '#f59e0b',
-  approved: '#3b82f6',
-  sent: '#10b981',
-  skipped: '#9ca3af',
+const VARIANT_MAP: Record<DraftStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  pending: 'outline',
+  approved: 'default',
+  sent: 'secondary',
+  skipped: 'outline',
 };
 
 const LABELS: Record<DraftStatus, string> = {
@@ -14,21 +15,17 @@ const LABELS: Record<DraftStatus, string> = {
   skipped: 'Skipped',
 };
 
+const COLOR_CLASS: Record<DraftStatus, string> = {
+  pending: 'border-amber-500 text-amber-600 dark:text-amber-400',
+  approved: 'bg-blue-600 text-white border-blue-600',
+  sent: 'bg-emerald-600 text-white border-emerald-600',
+  skipped: 'border-muted-foreground text-muted-foreground',
+};
+
 export default function StatusBadge({ status }: { status: DraftStatus }) {
   return (
-    <span
-      style={{
-        background: COLORS[status],
-        color: '#fff',
-        borderRadius: 4,
-        padding: '2px 8px',
-        fontSize: 12,
-        fontWeight: 600,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-      }}
-    >
+    <Badge variant={VARIANT_MAP[status]} className={COLOR_CLASS[status]}>
       {LABELS[status]}
-    </span>
+    </Badge>
   );
 }

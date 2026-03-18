@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { getDashboardToday, getDashboardUpcoming, listContacts, listTargets, triggerGenerate } from '../api/client';
 import TodayCard from '../components/dashboard/TodayCard';
 import UpcomingList from '../components/dashboard/UpcomingList';
-import OnboardingWizard from '../components/OnboardingWizard';
 import type { DashboardOccasionItem, DashboardUpcomingItem, MessageDraft, WhatsAppTarget } from '../types';
+import { Button } from '@/components/ui/button';
+import { Sparkles } from 'lucide-react';
 
 export default function DashboardPage() {
+  const { openTour } = useOutletContext<{ openTour: () => void }>();
   const [today, setToday] = useState<DashboardOccasionItem[]>([]);
   const [upcoming, setUpcoming] = useState<DashboardUpcomingItem[]>([]);
   const [targets, setTargets] = useState<WhatsAppTarget[]>([]);
   const [generating, setGenerating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [generateMsg, setGenerateMsg] = useState<{ text: string; ok: boolean } | null>(null);
-  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const load = useCallback(async () => {
     const [t, u, tgts, contacts] = await Promise.all([
@@ -24,9 +26,11 @@ export default function DashboardPage() {
     setToday(t);
     setUpcoming(u);
     setTargets(tgts);
-    if (contacts.length === 0) setShowOnboarding(true);
+    if (contacts.length === 0 && !localStorage.getItem('wishing_bot_tour_seen')) {
+      openTour();
+    }
     setLoading(false);
-  }, []);
+  }, [openTour]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -57,48 +61,40 @@ export default function DashboardPage() {
     }
   }
 
-  if (loading) return <div style={page}>Loading...</div>;
+  if (loading) return <div className="p-8 text-muted-foreground">Loading...</div>;
 
   return (
-    <div style={page}>
-      {showOnboarding && (
-        <OnboardingWizard onDismiss={() => setShowOnboarding(false)} />
-      )}
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h1 style={heading}>Dashboard</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div className="p-8 max-w-3xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <div className="flex items-center gap-3">
           {generateMsg && (
-            <span style={{ fontSize: 13, color: generateMsg.ok ? '#059669' : '#dc2626' }}>
+            <span className={`text-sm ${generateMsg.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
               {generateMsg.text}
             </span>
           )}
-          <button onClick={handleGenerate} disabled={generating} style={btnPrimary}>
+          <Button onClick={handleGenerate} disabled={generating} className="gap-2">
+            <Sparkles size={16} />
             {generating ? 'Generating...' : "Generate Today's Messages"}
-          </button>
+          </Button>
         </div>
       </div>
 
-      <section style={{ marginBottom: 32 }}>
-        <h2 style={subheading}>Today's Occasions {today.length > 0 && `(${today.length})`}</h2>
+      <section className="mb-8">
+        <h2 className="text-lg font-semibold mb-3">
+          Today's Occasions {today.length > 0 && <span className="text-muted-foreground font-normal text-base">({today.length})</span>}
+        </h2>
         {today.length === 0
-          ? <p style={{ color: '#9ca3af', fontSize: 14 }}>No occasions today.</p>
+          ? <p className="text-muted-foreground text-sm">No occasions today.</p>
           : today.map((item) => (
               <TodayCard key={item.occasion.id} item={item} targets={targets} onUpdate={handleDraftUpdate} />
             ))}
       </section>
 
       <section>
-        <h2 style={subheading}>Upcoming (next 7 days)</h2>
+        <h2 className="text-lg font-semibold mb-3">Upcoming (next 7 days)</h2>
         <UpcomingList items={upcoming} />
       </section>
     </div>
   );
 }
-
-const page: React.CSSProperties = { padding: 32, maxWidth: 900, margin: '0 auto' };
-const heading: React.CSSProperties = { fontSize: 24, fontWeight: 700, margin: 0, color: '#111827' };
-const subheading: React.CSSProperties = { fontSize: 17, fontWeight: 600, margin: '0 0 14px', color: '#374151' };
-const btnPrimary: React.CSSProperties = {
-  padding: '10px 18px', borderRadius: 6, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 14,
-};

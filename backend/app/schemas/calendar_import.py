@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from app.schemas.contact import RelationshipType
+
 OccasionTypeStr = Literal["birthday", "anniversary", "custom"]
 
 
@@ -25,7 +27,7 @@ class CalendarImportConfirmItem(BaseModel):
     day: int
     year: int | None = None
     phone: str
-    relationship: str = "friend"
+    relationship: RelationshipType = "friend"
     existing_contact_id: int | None = None  # if set, add occasion to existing contact
 
 

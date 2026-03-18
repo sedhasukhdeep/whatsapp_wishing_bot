@@ -21,6 +21,7 @@ class MessageDraft(Base):
     edited_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     final_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    gif_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     generation_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())

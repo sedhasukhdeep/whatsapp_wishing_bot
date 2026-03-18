@@ -1,9 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { approveDraft, regenerateDraft, sendDraft, skipDraft } from '../../api/client';
 import type { DashboardOccasionItem, MessageDraft, WhatsAppTarget } from '../../types';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import StatusBadge from '../shared/StatusBadge';
 import MessageEditor from './MessageEditor';
+import GifPicker from './GifPicker';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Cake, Heart, ImagePlus, Star, X } from 'lucide-react';
 
 interface Props {
   item: DashboardOccasionItem;
@@ -18,24 +29,36 @@ function occasionLabel(item: DashboardOccasionItem) {
   return occasion.label || 'Special Occasion';
 }
 
-const EMOJI: Record<string, string> = { birthday: '🎂', anniversary: '💍', custom: '🎉' };
+const ICON_MAP: Record<string, React.ReactNode> = {
+  birthday: <Cake size={16} />,
+  anniversary: <Heart size={16} />,
+  custom: <Star size={16} />,
+};
 
 export default function TodayCard({ item, targets, onUpdate }: Props) {
   const { contact, draft } = item;
   const initialText = draft?.edited_text ?? draft?.generated_text ?? '';
   const [text, setText] = useState(initialText);
-  const [selectedTarget, setSelectedTarget] = useState<number | ''>('');
+  const [selectedTarget, setSelectedTarget] = useState<string>('');
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [confirmRegen, setConfirmRegen] = useState(false);
+  const [gifUrl, setGifUrl] = useState<string | null>(null);
+  const [gifPreview, setGifPreview] = useState<string | null>(null);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+
+  useEffect(() => {
+    setText(draft?.edited_text ?? draft?.generated_text ?? '');
+    setGifUrl(draft?.gif_url ?? null);
+    setGifPreview(null);
+  }, [draft?.id]);
 
   const linkedChat = contact.whatsapp_chat_id;
   const linkedChatName = contact.whatsapp_chat_name || contact.whatsapp_chat_id;
   const canSendDirectly = !!linkedChat;
   const canSendViaTarget = selectedTarget !== '';
   const hasEdits = text !== (draft?.generated_text ?? '');
-
   const currentDraft = draft;
 
   async function handle(action: () => Promise<MessageDraft>, successMsg?: string) {
@@ -66,44 +89,58 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
 
   function handleSend() {
     setLoading('send');
-    const targetId = canSendDirectly ? null : (selectedTarget as number);
-    handle(() => sendDraft(currentDraft!.id, targetId), 'Message sent!');
+    const targetId = canSendDirectly ? null : parseInt(selectedTarget, 10);
+    handle(() => sendDraft(currentDraft!.id, targetId, gifUrl), 'Message sent!');
   }
 
   return (
-    <div style={card}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 600 }}>
-            {EMOJI[item.occasion.type] || '🎉'} {contact.name}
+    <Card className="mb-4">
+      <CardHeader className="pb-2 pt-4 px-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 font-semibold text-base">
+              {ICON_MAP[item.occasion.type] ?? <Star size={16} />}
+              {contact.name}
+            </div>
+            <div className="text-sm text-muted-foreground mt-0.5">
+              {occasionLabel(item)} · {contact.relationship}
+              {contact.relationship_label && ` (${contact.relationship_label})`}
+            </div>
           </div>
-          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>
-            {occasionLabel(item)} · {contact.relationship}
-          </div>
+          {currentDraft && <StatusBadge status={currentDraft.status} />}
         </div>
-        {currentDraft && <StatusBadge status={currentDraft.status} />}
-      </div>
+      </CardHeader>
 
-      {currentDraft ? (
-        <>
-          <MessageEditor
-            value={text}
-            onChange={setText}
-            onRegenerate={() => {
-              if (hasEdits) {
-                setConfirmRegen(true);
-              } else {
-                doRegen();
-              }
-            }}
-            regenerating={loading === 'regen'}
-          />
+      <CardContent className="px-4 pb-4">
+        {currentDraft ? (
+          <>
+            <MessageEditor
+              value={text}
+              onChange={setText}
+              onRegenerate={() => {
+                if (hasEdits) setConfirmRegen(true);
+                else doRegen();
+              }}
+              regenerating={loading === 'regen'}
+            />
 
-          {currentDraft.status !== 'sent' && currentDraft.status !== 'skipped' && (
-            <div style={{ marginTop: 10 }}>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* GIF preview */}
+            {gifPreview && (
+              <div className="relative inline-block mb-3">
+                <img src={gifPreview} alt="Selected GIF" className="h-24 rounded border" />
                 <button
-                  style={btnPrimary}
+                  onClick={() => { setGifUrl(null); setGifPreview(null); }}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center"
+                >
+                  <X size={10} />
+                </button>
+              </div>
+            )}
+
+            {currentDraft.status !== 'sent' && currentDraft.status !== 'skipped' && (
+              <div className="flex flex-wrap gap-2 items-center">
+                <Button
+                  size="sm"
                   disabled={!!loading}
                   onClick={() => {
                     setLoading('approve');
@@ -114,86 +151,91 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
                   }}
                 >
                   {loading === 'approve' ? '...' : 'Approve'}
-                </button>
+                </Button>
 
                 {canSendDirectly ? (
-                  <button
-                    style={{ ...btnGreen, opacity: currentDraft.status === 'approved' ? 1 : 0.5 }}
+                  <Button
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
                     disabled={currentDraft.status !== 'approved' || !!loading}
                     onClick={handleSend}
                   >
                     {loading === 'send' ? 'Sending...' : `Send to ${linkedChatName}`}
-                  </button>
+                  </Button>
                 ) : (
                   <>
-                    <select
-                      value={selectedTarget}
-                      onChange={(e) => setSelectedTarget(Number(e.target.value) || '')}
-                      style={selectStyle}
-                    >
-                      <option value="">Select target...</option>
-                      {targets.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
-                    <button
-                      style={{ ...btnGreen, opacity: (currentDraft.status === 'approved' && canSendViaTarget) ? 1 : 0.5 }}
+                    <Select value={selectedTarget} onValueChange={setSelectedTarget}>
+                      <SelectTrigger className="h-8 text-xs w-44">
+                        <SelectValue placeholder="Select target..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {targets.map((t) => (
+                          <SelectItem key={t.id} value={String(t.id)}>
+                            {t.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
                       disabled={currentDraft.status !== 'approved' || !canSendViaTarget || !!loading}
                       onClick={handleSend}
                     >
                       {loading === 'send' ? 'Sending...' : 'Send'}
-                    </button>
+                    </Button>
                   </>
                 )}
 
-                <button
-                  style={btnGhost}
+                <Button
+                  size="sm"
+                  variant="outline"
                   disabled={!!loading}
                   onClick={() => { setLoading('skip'); handle(() => skipDraft(currentDraft.id)); }}
                 >
                   Skip
-                </button>
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="gap-1 text-muted-foreground"
+                  onClick={() => setShowGifPicker(true)}
+                >
+                  <ImagePlus size={14} />
+                  {gifUrl ? 'Change GIF' : 'Add GIF'}
+                </Button>
               </div>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground italic">
+            No draft yet — click "Generate Today's Messages" above.
+          </p>
+        )}
 
-              {!canSendDirectly && targets.length === 0 && (
-                <p style={{ margin: '8px 0 0', fontSize: 12, color: '#9ca3af' }}>
-                  Tip: Link a WhatsApp chat on the contact's profile for one-click sending.
-                </p>
-              )}
-            </div>
-          )}
-        </>
-      ) : (
-        <div style={{ fontSize: 13, color: '#9ca3af', fontStyle: 'italic' }}>
-          No draft yet — click "Generate Today's Messages" above.
-        </div>
-      )}
+        {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+        {success && <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-400 font-medium">{success}</p>}
 
-      {error && <div style={{ marginTop: 8, fontSize: 13, color: '#ef4444' }}>{error}</div>}
-      {success && <div style={{ marginTop: 8, fontSize: 13, color: '#059669', fontWeight: 500 }}>{success}</div>}
+        {confirmRegen && (
+          <ConfirmDialog
+            message="Your edits will be lost. Regenerate the message anyway?"
+            onConfirm={() => { setConfirmRegen(false); doRegen(); }}
+            onCancel={() => setConfirmRegen(false)}
+          />
+        )}
 
-      {confirmRegen && (
-        <ConfirmDialog
-          message="Your edits will be lost. Regenerate the message anyway?"
-          onConfirm={() => { setConfirmRegen(false); doRegen(); }}
-          onCancel={() => setConfirmRegen(false)}
-        />
-      )}
-    </div>
+        {showGifPicker && (
+          <GifPicker
+            onSelect={(mp4, preview) => {
+              setGifUrl(mp4);
+              setGifPreview(preview);
+              setShowGifPicker(false);
+            }}
+            onCancel={() => setShowGifPicker(false)}
+          />
+        )}
+      </CardContent>
+    </Card>
   );
 }
-
-const card: React.CSSProperties = {
-  background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8,
-  padding: 16, marginBottom: 16,
-};
-const btnPrimary: React.CSSProperties = {
-  padding: '8px 14px', borderRadius: 6, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 13,
-};
-const btnGreen: React.CSSProperties = {
-  padding: '8px 14px', borderRadius: 6, border: 'none', background: '#10b981', color: '#fff', cursor: 'pointer', fontSize: 13,
-};
-const btnGhost: React.CSSProperties = {
-  padding: '8px 14px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontSize: 13, color: '#6b7280',
-};
-const selectStyle: React.CSSProperties = {
-  padding: '8px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, background: '#fff',
-};

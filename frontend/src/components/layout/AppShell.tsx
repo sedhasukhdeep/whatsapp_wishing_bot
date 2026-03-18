@@ -1,69 +1,106 @@
+import {
+  CalendarDays,
+  HelpCircle,
+  History,
+  LayoutDashboard,
+  MessageSquare,
+  Moon,
+  Radio,
+  Settings,
+  Sun,
+  Users,
+} from 'lucide-react';
+import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
+import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
+import { useTheme } from './ThemeProvider';
+import OnboardingWizard from '@/components/OnboardingWizard';
 
-const links = [
-  { to: '/dashboard', label: 'Dashboard', icon: '📊' },
-  { to: '/contacts', label: 'Contacts', icon: '👥' },
-  { to: '/targets', label: 'WhatsApp', icon: '💬' },
+const navLinks = [
+  { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+  { to: '/contacts', label: 'Contacts', Icon: Users },
+  { to: '/targets', label: 'WhatsApp', Icon: MessageSquare },
+  { to: '/calendar', label: 'Calendar', Icon: CalendarDays },
+  { to: '/history', label: 'History', Icon: History },
+  { to: '/broadcasts', label: 'Broadcasts', Icon: Radio },
+  { to: '/settings', label: 'Settings', Icon: Settings },
 ];
 
 export default function AppShell() {
+  const { theme, toggleTheme } = useTheme();
+  const [showTour, setShowTour] = useState(false);
+
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'system-ui, sans-serif' }}>
-      <nav style={sidebar}>
-        <div style={brand}>
-          <span style={{ fontSize: 22 }}>🎉</span>
+    <div className="flex h-screen bg-background text-foreground">
+      <nav className="w-56 flex-shrink-0 flex flex-col border-r border-border bg-card">
+        {/* Brand */}
+        <div className="flex items-center gap-3 px-4 py-5 border-b border-border">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm">
+            W
+          </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.2 }}>Wishing Bot</div>
-            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 1 }}>Never miss an occasion</div>
+            <div className="font-bold text-sm leading-tight">Wishing Bot</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Never miss an occasion</div>
           </div>
         </div>
 
-        <div style={{ padding: '8px 0' }}>
-          {links.map((l) => (
+        {/* Navigation */}
+        <div className="flex-1 py-2 overflow-y-auto">
+          {navLinks.map(({ to, label, Icon }) => (
             <NavLink
-              key={l.to}
-              to={l.to}
-              style={({ isActive }) => ({
-                ...navLink,
-                background: isActive ? '#eff6ff' : 'transparent',
-                color: isActive ? '#2563eb' : '#374151',
-                fontWeight: isActive ? 600 : 400,
-              })}
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 px-3 py-2.5 mx-2 my-0.5 rounded-md text-sm transition-colors',
+                  isActive
+                    ? 'bg-primary text-primary-foreground font-medium'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                )
+              }
             >
-              <span style={{ fontSize: 16, width: 20 }}>{l.icon}</span>
-              {l.label}
+              <Icon size={16} />
+              {label}
             </NavLink>
           ))}
         </div>
 
-        <div style={{ marginTop: 'auto', padding: '16px 12px', borderTop: '1px solid #f3f4f6' }}>
-          <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 6 }}>Quick links</div>
+        {/* Footer: theme toggle + quick links */}
+        <div className="border-t border-border p-3 space-y-3">
           <NavLink
             to="/contacts/import"
-            style={{ ...navLink, fontSize: 12, color: '#6b7280', padding: '6px 10px' }}
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors px-1"
           >
-            <span style={{ fontSize: 14 }}>📅</span> Import Calendar
+            <CalendarDays size={12} />
+            Import Calendar
           </NavLink>
+          <button
+            onClick={() => setShowTour(true)}
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors px-1 w-full"
+          >
+            <HelpCircle size={12} />
+            How to use
+          </button>
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              {theme === 'dark' ? <Moon size={14} /> : <Sun size={14} />}
+              {theme === 'dark' ? 'Dark' : 'Light'} mode
+            </div>
+            <Switch
+              checked={theme === 'dark'}
+              onCheckedChange={toggleTheme}
+              aria-label="Toggle dark mode"
+            />
+          </div>
         </div>
       </nav>
 
-      <main style={{ flex: 1, overflow: 'auto', background: '#f9fafb' }}>
-        <Outlet />
+      <main className="flex-1 overflow-auto bg-background">
+        <Outlet context={{ openTour: () => setShowTour(true) }} />
       </main>
+
+      {showTour && <OnboardingWizard onDismiss={() => setShowTour(false)} />}
     </div>
   );
 }
-
-const sidebar: React.CSSProperties = {
-  width: 220, background: '#fff', borderRight: '1px solid #e5e7eb',
-  display: 'flex', flexDirection: 'column', flexShrink: 0,
-};
-const brand: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 10,
-  padding: '20px 16px', borderBottom: '1px solid #e5e7eb',
-};
-const navLink: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 10,
-  padding: '10px 14px', textDecoration: 'none',
-  fontSize: 14, borderRadius: 6, margin: '2px 8px', transition: 'background 0.1s',
-};

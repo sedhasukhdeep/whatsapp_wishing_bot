@@ -2,6 +2,26 @@ import { useEffect, useRef, useState } from 'react';
 import { createTarget, deleteTarget, getBridgeStatus, getWaChats, listTargets, updateTarget, type WaChat } from '../api/client';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import type { BridgeStatus, TargetType, WhatsAppTarget } from '../types';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { CheckCircle2, ChevronDown, Plus, RefreshCw, WifiOff } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface TargetFormState {
   name: string;
@@ -35,6 +55,15 @@ export default function TargetsPage() {
   }
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (status?.ready) return;
+    const id = setInterval(async () => {
+      const s = await getBridgeStatus();
+      setStatus(s);
+    }, 4000);
+    return () => clearInterval(id);
+  }, [status?.ready]);
 
   async function loadChats() {
     setChatsLoading(true);
@@ -106,149 +135,191 @@ export default function TargetsPage() {
   }
 
   return (
-    <div style={page}>
-      <h1 style={heading}>WhatsApp Targets</h1>
+    <div className="p-8">
+      <h1 className="text-2xl font-bold mb-6">WhatsApp Targets</h1>
 
       {/* Bridge status */}
-      <div style={statusCard}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: status?.qr_image ? 16 : 0 }}>
-          <div style={{ width: 10, height: 10, borderRadius: '50%', background: status?.ready ? '#10b981' : '#f59e0b', flexShrink: 0 }} />
-          <span style={{ fontWeight: 600, fontSize: 15 }}>
-            WhatsApp: {status?.ready ? 'Connected' : 'Not connected — scan QR to link your phone'}
-          </span>
-          <button onClick={load} style={refreshBtn}>Refresh</button>
-        </div>
-        {status?.qr_image && (
-          <div style={{ marginTop: 12 }}>
-            <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 10px' }}>
-              Open WhatsApp → Settings → Linked Devices → Link a Device → scan below
-            </p>
-            <img src={status.qr_image} alt="WhatsApp QR" style={{ width: 180, height: 180, border: '1px solid #e5e7eb', borderRadius: 8 }} />
+      <Card className="mb-6">
+        <CardContent className="pt-4">
+          <div className="flex items-center gap-3 mb-3">
+            {status?.ready
+              ? <CheckCircle2 size={18} className="text-emerald-500" />
+              : <WifiOff size={18} className="text-amber-500" />}
+            <span className="font-semibold">
+              WhatsApp: {status?.ready ? 'Connected' : 'Not connected — scan QR to link your phone'}
+            </span>
+            <Button variant="outline" size="sm" onClick={load} className="ml-auto gap-1">
+              <RefreshCw size={12} />
+              Refresh
+            </Button>
           </div>
-        )}
+          {status?.qr_image && (
+            <div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Open WhatsApp → Settings → Linked Devices → Link a Device → scan below
+              </p>
+              <img src={status.qr_image} alt="WhatsApp QR" className="w-44 h-44 rounded-lg border" />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-semibold">Send Targets</h2>
+        <Button onClick={openAdd} className="gap-2">
+          <Plus size={16} />
+          Add Target
+        </Button>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '24px 0 16px' }}>
-        <h2 style={{ fontSize: 17, fontWeight: 600, margin: 0 }}>Send Targets</h2>
-        <button onClick={openAdd} style={btnPrimary}>+ Add Target</button>
-      </div>
-
-      {targets.length === 0
-        ? <p style={{ color: '#9ca3af', fontSize: 14 }}>No targets yet. Add one to send messages.</p>
-        : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, background: '#fff', borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
-            <thead>
-              <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb', textAlign: 'left' }}>
-                <th style={th}>Name</th><th style={th}>Type</th><th style={th}>Chat ID</th><th style={th}></th>
-              </tr>
-            </thead>
-            <tbody>
+      {targets.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No targets yet. Add one to send messages.</p>
+      ) : (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Chat ID</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {targets.map((t) => (
-                <tr key={t.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                  <td style={td}><strong>{t.name}</strong>{t.description && <span style={{ color: '#9ca3af', marginLeft: 6, fontSize: 12 }}>{t.description}</span>}</td>
-                  <td style={td}><span style={{ ...typeBadge, background: t.target_type === 'group' ? '#dbeafe' : '#d1fae5', color: t.target_type === 'group' ? '#1d4ed8' : '#065f46' }}>{t.target_type}</span></td>
-                  <td style={{ ...td, fontFamily: 'monospace', fontSize: 12, color: '#6b7280' }}>{t.chat_id}</td>
-                  <td style={td}>
-                    <button onClick={() => openEdit(t)} style={btnEditSm}>Edit</button>{' '}
-                    <button onClick={() => setConfirmDelete(t)} style={btnDeleteSm}>Delete</button>
-                  </td>
-                </tr>
+                <TableRow key={t.id}>
+                  <TableCell>
+                    <span className="font-medium">{t.name}</span>
+                    {t.description && <span className="text-muted-foreground text-xs ml-2">{t.description}</span>}
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={cn(
+                      'border-0 text-xs',
+                      t.target_type === 'group'
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                        : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                    )}>
+                      {t.target_type}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{t.chat_id}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(t)}>Edit</Button>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => setConfirmDelete(t)}>Delete</Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
-      {/* Add/Edit modal */}
-      {showForm && (
-        <div style={overlay}>
-          <div style={formBox}>
-            <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>{editTarget ? 'Edit Target' : 'Add Target'}</h3>
-            <p style={{ margin: '0 0 16px', fontSize: 13, color: '#6b7280' }}>
-              {status?.ready
-                ? 'Select a chat from your WhatsApp to link it as a send target.'
-                : 'Connect WhatsApp first to pick chats automatically.'}
-            </p>
+      {/* Add/Edit dialog */}
+      <Dialog open={showForm} onOpenChange={(open) => { if (!open) setShowForm(false); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editTarget ? 'Edit Target' : 'Add Target'}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {status?.ready
+              ? 'Select a chat from your WhatsApp to link it as a send target.'
+              : 'Connect WhatsApp first to pick chats automatically.'}
+          </p>
 
-            <form onSubmit={handleSave}>
-              {/* Chat picker */}
-              <label style={lbl}>WhatsApp Chat *</label>
-              <div style={{ position: 'relative' }}>
+          <form onSubmit={handleSave} className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">WhatsApp Chat *</label>
+              <div className="relative">
                 <div
                   onClick={() => { setShowChatPicker((v) => !v); setTimeout(() => searchRef.current?.focus(), 50); }}
-                  style={{ ...input, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', userSelect: 'none' }}
+                  className="flex items-center justify-between px-3 py-2 border border-input rounded-md cursor-pointer bg-background text-sm"
                 >
-                  <span style={{ color: form.chat_id ? '#111827' : '#9ca3af' }}>
+                  <span className={form.chat_id ? 'text-foreground' : 'text-muted-foreground'}>
                     {form.chat_id
                       ? (waChats.find((c) => c.id === form.chat_id)?.name || form.chat_id)
                       : 'Select a chat...'}
                   </span>
-                  <span style={{ fontSize: 11, color: '#9ca3af' }}>▼</span>
+                  <ChevronDown size={14} className="text-muted-foreground" />
                 </div>
 
                 {showChatPicker && (
-                  <div style={dropdown}>
-                    <input
-                      ref={searchRef}
-                      value={chatSearch}
-                      onChange={(e) => setChatSearch(e.target.value)}
-                      placeholder="Search by name..."
-                      style={{ ...input, margin: '8px', width: 'calc(100% - 16px)', boxSizing: 'border-box' }}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                    {chatsLoading && <div style={dropItem}>Loading chats...</div>}
-                    {chatsError && <div style={{ ...dropItem, color: '#dc2626' }}>{chatsError}</div>}
+                  <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-background border border-border rounded-md shadow-lg">
+                    <div className="p-2">
+                      <Input
+                        ref={searchRef}
+                        value={chatSearch}
+                        onChange={(e) => setChatSearch(e.target.value)}
+                        placeholder="Search by name..."
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                    {chatsLoading && <div className="px-3 py-2 text-sm text-muted-foreground">Loading chats...</div>}
+                    {chatsError && <div className="px-3 py-2 text-sm text-destructive">{chatsError}</div>}
                     {!chatsLoading && !chatsError && filteredChats.length === 0 && (
-                      <div style={dropItem}>No chats found</div>
+                      <div className="px-3 py-2 text-sm text-muted-foreground">No chats found</div>
                     )}
-                    <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+                    <div className="max-h-64 overflow-y-auto">
                       {filteredChats.map((chat) => (
                         <div
                           key={chat.id}
                           onClick={() => selectChat(chat)}
-                          style={{ ...dropItem, background: form.chat_id === chat.id ? '#eff6ff' : '#fff' }}
+                          className={cn(
+                            'px-3 py-2 cursor-pointer hover:bg-accent border-b border-border last:border-0 text-sm',
+                            form.chat_id === chat.id && 'bg-accent'
+                          )}
                         >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: 500 }}>{chat.name}</span>
-                            <span style={{ ...typeBadge, fontSize: 11, background: chat.type === 'group' ? '#dbeafe' : '#d1fae5', color: chat.type === 'group' ? '#1d4ed8' : '#065f46' }}>
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{chat.name}</span>
+                            <Badge className={cn(
+                              'border-0 text-xs',
+                              chat.type === 'group'
+                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                            )}>
                               {chat.type}
-                            </span>
+                            </Badge>
                           </div>
-                          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2, fontFamily: 'monospace' }}>{chat.id}</div>
+                          <div className="text-xs text-muted-foreground mt-0.5 font-mono">{chat.id}</div>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
               </div>
+            </div>
 
-              <label style={lbl}>Label *</label>
-              <input
+            <div>
+              <label className="block text-sm font-medium mb-1">Label *</label>
+              <Input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 required
-                style={input}
                 placeholder="e.g. Family Group, Wifey"
               />
+            </div>
 
-              <label style={lbl}>Description (optional)</label>
-              <input
+            <div>
+              <label className="block text-sm font-medium mb-1">Description (optional)</label>
+              <Input
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                style={input}
                 placeholder="e.g. For birthday wishes only"
               />
+            </div>
 
-              {error && <p style={{ color: '#ef4444', fontSize: 13, marginTop: 8 }}>{error}</p>}
-              <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
-                <button type="button" onClick={() => setShowForm(false)} style={cancelBtn}>Cancel</button>
-                <button type="submit" disabled={saving || !form.chat_id} style={{ ...saveBtn, opacity: form.chat_id ? 1 : 0.5 }}>
-                  {saving ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            {error && <p className="text-sm text-destructive">{error}</p>}
+
+            <div className="flex gap-2 justify-end pt-2">
+              <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+              <Button type="submit" disabled={saving || !form.chat_id}>
+                {saving ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {confirmDelete && (
         <ConfirmDialog
@@ -260,22 +331,3 @@ export default function TargetsPage() {
     </div>
   );
 }
-
-const page: React.CSSProperties = { padding: 32 };
-const heading: React.CSSProperties = { fontSize: 24, fontWeight: 700, margin: '0 0 20px', color: '#111827' };
-const statusCard: React.CSSProperties = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 20 };
-const btnPrimary: React.CSSProperties = { padding: '10px 18px', borderRadius: 6, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 14 };
-const refreshBtn: React.CSSProperties = { padding: '4px 10px', borderRadius: 4, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontSize: 12 };
-const th: React.CSSProperties = { padding: '10px 14px', fontWeight: 600, color: '#374151' };
-const td: React.CSSProperties = { padding: '10px 14px', color: '#4b5563' };
-const typeBadge: React.CSSProperties = { padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 500 };
-const btnEditSm: React.CSSProperties = { padding: '4px 10px', fontSize: 12, border: '1px solid #d1d5db', borderRadius: 4, cursor: 'pointer', background: '#fff' };
-const btnDeleteSm: React.CSSProperties = { padding: '4px 10px', fontSize: 12, border: 'none', borderRadius: 4, cursor: 'pointer', background: '#fee2e2', color: '#dc2626' };
-const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 };
-const formBox: React.CSSProperties = { background: '#fff', borderRadius: 8, padding: 24, width: 500, maxWidth: '95%', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', maxHeight: '90vh', overflowY: 'auto' };
-const lbl: React.CSSProperties = { display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4, marginTop: 12, color: '#374151' };
-const input: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14, background: '#fff' };
-const dropdown: React.CSSProperties = { position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 10, marginTop: 4 };
-const dropItem: React.CSSProperties = { padding: '10px 12px', cursor: 'pointer', fontSize: 13, borderBottom: '1px solid #f3f4f6' };
-const cancelBtn: React.CSSProperties = { padding: '8px 16px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' };
-const saveBtn: React.CSSProperties = { padding: '8px 16px', borderRadius: 6, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer' };

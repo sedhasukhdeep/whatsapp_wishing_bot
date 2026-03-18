@@ -5,7 +5,6 @@ from pydantic import BaseModel
 
 from app.schemas.contact import ContactOut
 from app.schemas.occasion import OccasionOut
-from app.schemas.whatsapp_target import WhatsAppTargetOut
 
 DraftStatus = Literal["pending", "approved", "sent", "skipped"]
 
@@ -21,6 +20,7 @@ class MessageDraftOut(BaseModel):
     generated_text: str
     edited_text: str | None
     final_text: str | None
+    gif_url: str | None
     status: DraftStatus
     sent_at: datetime | None
     created_at: datetime
@@ -33,6 +33,7 @@ class DraftApproveRequest(BaseModel):
 
 class DraftSendRequest(BaseModel):
     target_id: int | None = None  # None = use contact's linked whatsapp_chat_id
+    gif_url: str | None = None
 
 
 # Dashboard composite response
@@ -50,3 +51,34 @@ class DashboardUpcomingItem(BaseModel):
     days_away: int
     turning_age: int | None = None
     years_together: int | None = None
+
+
+# Phase 4: History
+class ContactSummary(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    name: str
+    relationship: str
+    relationship_label: str | None
+
+
+class OccasionSummary(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    type: str
+    label: str | None
+
+
+class DraftHistoryItem(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    occasion_date: date
+    final_text: str | None
+    sent_at: datetime | None
+    gif_url: str | None
+    contact: ContactSummary
+    occasion: OccasionSummary
+

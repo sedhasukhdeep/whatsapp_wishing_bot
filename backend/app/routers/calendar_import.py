@@ -13,13 +13,19 @@ from app.services.calendar_import_service import parse_ics_preview
 
 router = APIRouter(prefix="/api/calendar", tags=["calendar"])
 
+MAX_ICS_SIZE = 5 * 1024 * 1024  # 5 MB
+
 
 @router.post("/preview", response_model=list[CalendarImportPreviewItem])
 async def preview_ics(file: UploadFile, db: Session = Depends(get_db)):
     """Upload a .ics file and preview what would be imported."""
     if not file.filename or not file.filename.lower().endswith(".ics"):
         raise HTTPException(status_code=400, detail="File must be a .ics file")
-    data = await file.read()
+    if file.content_type not in ("text/calendar", "application/octet-stream"):
+        raise HTTPException(status_code=400, detail="File must have content type text/calendar")
+    data = await file.read(MAX_ICS_SIZE + 1)
+    if len(data) > MAX_ICS_SIZE:
+        raise HTTPException(status_code=413, detail="File must be 5 MB or smaller")
     try:
         items = parse_ics_preview(data)
     except Exception as e:
