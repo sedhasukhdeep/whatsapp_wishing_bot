@@ -161,6 +161,10 @@ export interface AISettings {
   ai_provider: string;
   anthropic_api_key_masked: string | null;
   claude_model: string;
+  openai_api_key_masked: string | null;
+  openai_model: string;
+  gemini_api_key_masked: string | null;
+  gemini_model: string;
   local_ai_url: string;
   local_ai_model: string;
   giphy_api_key_masked: string | null;
@@ -173,6 +177,10 @@ export interface AISettingsUpdate {
   ai_provider: string;
   anthropic_api_key?: string | null;
   claude_model: string;
+  openai_api_key?: string | null;
+  openai_model?: string | null;
+  gemini_api_key?: string | null;
+  gemini_model?: string | null;
   local_ai_url?: string | null;
   local_ai_model?: string | null;
   giphy_api_key?: string | null;
@@ -196,8 +204,12 @@ export interface AIStatus {
   local_model: string | null;
   local_url: string;
   claude_configured: boolean;
-  active_provider: string;
   claude_model: string;
+  openai_configured: boolean;
+  openai_model: string;
+  gemini_configured: boolean;
+  gemini_model: string;
+  active_provider: string;
 }
 
 // Phase 7: Broadcasts

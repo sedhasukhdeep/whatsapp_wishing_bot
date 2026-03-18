@@ -16,9 +16,28 @@ const CLAUDE_MODELS = [
   { value: 'claude-opus-4-6', label: 'Claude Opus 4.6 (most capable)' },
 ];
 
+const OPENAI_MODELS = [
+  { value: 'gpt-4o-mini', label: 'GPT-4o Mini (fast, cheap)' },
+  { value: 'gpt-4o', label: 'GPT-4o (balanced)' },
+  { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
+  { value: 'gpt-4.1', label: 'GPT-4.1' },
+  { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+  { value: 'o4-mini', label: 'o4-mini (reasoning)' },
+];
+
+const GEMINI_MODELS = [
+  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (default, fast)' },
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (balanced)' },
+  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (most capable)' },
+  { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+  { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+];
+
 const AI_PROVIDERS = [
   { value: 'auto', label: 'Auto (local first, fall back to Claude)' },
-  { value: 'claude', label: 'Claude only' },
+  { value: 'claude', label: 'Claude (Anthropic)' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'gemini', label: 'Google Gemini' },
   { value: 'local', label: 'Local only (LM Studio / Ollama)' },
 ];
 
@@ -35,9 +54,15 @@ export default function SettingsPage() {
   const [aiProvider, setAiProvider] = useState('auto');
   const [apiKey, setApiKey] = useState('');
   const [claudeModel, setClaudeModel] = useState('claude-3-5-haiku-20241022');
+  const [showKey, setShowKey] = useState(false);
+  const [openaiApiKey, setOpenaiApiKey] = useState('');
+  const [openaiModel, setOpenaiModel] = useState('gpt-4o-mini');
+  const [showOpenaiKey, setShowOpenaiKey] = useState(false);
+  const [geminiApiKey, setGeminiApiKey] = useState('');
+  const [geminiModel, setGeminiModel] = useState('gemini-2.0-flash');
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [localAiUrl, setLocalAiUrl] = useState('http://localhost:1234/v1');
   const [localAiModel, setLocalAiModel] = useState('');
-  const [showKey, setShowKey] = useState(false);
 
   // Giphy form state
   const [giphyKey, setGiphyKey] = useState('');
@@ -57,6 +82,8 @@ export default function SettingsPage() {
         setStatus(st);
         setAiProvider(s.ai_provider);
         setClaudeModel(s.claude_model);
+        setOpenaiModel(s.openai_model);
+        setGeminiModel(s.gemini_model);
         setLocalAiUrl(s.local_ai_url);
         setLocalAiModel(s.local_ai_model);
         setAdminChatId(s.admin_wa_chat_id ?? '');
@@ -100,6 +127,10 @@ export default function SettingsPage() {
         ai_provider: aiProvider,
         anthropic_api_key: apiKey !== '' ? apiKey : null,
         claude_model: claudeModel,
+        openai_api_key: openaiApiKey !== '' ? openaiApiKey : null,
+        openai_model: openaiModel,
+        gemini_api_key: geminiApiKey !== '' ? geminiApiKey : null,
+        gemini_model: geminiModel,
         local_ai_url: localAiUrl,
         local_ai_model: localAiModel,
         giphy_api_key: giphyKey !== '' ? giphyKey : null,
@@ -109,6 +140,8 @@ export default function SettingsPage() {
       });
       setSettings(updated);
       setApiKey('');
+      setOpenaiApiKey('');
+      setGeminiApiKey('');
       setGiphyKey('');
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -121,8 +154,10 @@ export default function SettingsPage() {
     }
   };
 
-  const showLocalFields = aiProvider === 'local' || aiProvider === 'auto';
   const showClaudeFields = aiProvider === 'claude' || aiProvider === 'auto';
+  const showOpenAIFields = aiProvider === 'openai';
+  const showGeminiFields = aiProvider === 'gemini';
+  const showLocalFields = aiProvider === 'local' || aiProvider === 'auto';
 
   if (loading) {
     return (
@@ -164,11 +199,20 @@ export default function SettingsPage() {
             <>
               <StatusRow label="Active provider" value={status.active_provider} ok={true} />
               <StatusRow
-                label="Claude configured"
-                value={status.claude_configured ? 'Yes' : 'No API key'}
+                label="Claude"
+                value={status.claude_configured ? `Configured — ${status.claude_model}` : 'No API key'}
                 ok={status.claude_configured}
               />
-              <StatusRow label="Active Claude model" value={status.claude_model} ok={true} />
+              <StatusRow
+                label="OpenAI"
+                value={status.openai_configured ? `Configured — ${status.openai_model}` : 'No API key'}
+                ok={status.openai_configured}
+              />
+              <StatusRow
+                label="Gemini"
+                value={status.gemini_configured ? `Configured — ${status.gemini_model}` : 'No API key'}
+                ok={status.gemini_configured}
+              />
               <StatusRow
                 label="Local AI"
                 value={status.local_available ? `Available — ${status.local_model}` : 'Not reachable'}
@@ -237,6 +281,96 @@ export default function SettingsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {CLAUDE_MODELS.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </>
+          )}
+
+          {showOpenAIFields && (
+            <>
+              <Field
+                label="OpenAI API Key"
+                description={
+                  settings?.openai_api_key_masked
+                    ? `Current key: ${settings.openai_api_key_masked}. Leave blank to keep unchanged.`
+                    : 'No API key set. Paste your key from platform.openai.com.'
+                }
+              >
+                <div className="relative">
+                  <Input
+                    type={showOpenaiKey ? 'text' : 'password'}
+                    placeholder={settings?.openai_api_key_masked ?? 'sk-...'}
+                    value={openaiApiKey}
+                    onChange={(e) => setOpenaiApiKey(e.target.value)}
+                    className="pr-10 font-mono text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowOpenaiKey((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showOpenaiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </Field>
+
+              <Field label="OpenAI Model" description="Model used when OpenAI is the active provider.">
+                <Select value={openaiModel} onValueChange={setOpenaiModel}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {OPENAI_MODELS.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </>
+          )}
+
+          {showGeminiFields && (
+            <>
+              <Field
+                label="Gemini API Key"
+                description={
+                  settings?.gemini_api_key_masked
+                    ? `Current key: ${settings.gemini_api_key_masked}. Leave blank to keep unchanged.`
+                    : 'No API key set. Paste your key from aistudio.google.com.'
+                }
+              >
+                <div className="relative">
+                  <Input
+                    type={showGeminiKey ? 'text' : 'password'}
+                    placeholder={settings?.gemini_api_key_masked ?? 'AIza...'}
+                    value={geminiApiKey}
+                    onChange={(e) => setGeminiApiKey(e.target.value)}
+                    className="pr-10 font-mono text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowGeminiKey((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showGeminiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </Field>
+
+              <Field label="Gemini Model" description="Model used when Gemini is the active provider.">
+                <Select value={geminiModel} onValueChange={setGeminiModel}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GEMINI_MODELS.map((m) => (
                       <SelectItem key={m.value} value={m.value}>
                         {m.label}
                       </SelectItem>

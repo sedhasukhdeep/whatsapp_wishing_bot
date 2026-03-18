@@ -39,6 +39,10 @@ def _build_settings_out(db: Session) -> AISettingsOut:
     ai_provider = _get_setting(db, "ai_provider") or env_settings.ai_provider
     api_key = _get_setting(db, "anthropic_api_key") or env_settings.anthropic_api_key or None
     claude_model = _get_setting(db, "claude_model") or "claude-3-5-haiku-20241022"
+    openai_api_key = _get_setting(db, "openai_api_key") or env_settings.openai_api_key or None
+    openai_model = _get_setting(db, "openai_model") or env_settings.openai_model
+    gemini_api_key = _get_setting(db, "gemini_api_key") or env_settings.gemini_api_key or None
+    gemini_model = _get_setting(db, "gemini_model") or env_settings.gemini_model
     local_ai_url = _get_setting(db, "local_ai_url") or env_settings.local_ai_url
     local_ai_model = _get_setting(db, "local_ai_model") or env_settings.local_ai_model or ""
     giphy_api_key = _get_setting(db, "giphy_api_key")
@@ -49,6 +53,10 @@ def _build_settings_out(db: Session) -> AISettingsOut:
         ai_provider=ai_provider,
         anthropic_api_key_masked=_mask_key(api_key),
         claude_model=claude_model,
+        openai_api_key_masked=_mask_key(openai_api_key),
+        openai_model=openai_model,
+        gemini_api_key_masked=_mask_key(gemini_api_key),
+        gemini_model=gemini_model,
         local_ai_url=local_ai_url,
         local_ai_model=local_ai_model,
         giphy_api_key_masked=_mask_key(giphy_api_key),
@@ -69,6 +77,14 @@ def update_settings(body: AISettingsUpdate, db: Session = Depends(get_db)):
     if body.anthropic_api_key is not None:
         _upsert(db, "anthropic_api_key", body.anthropic_api_key)
     _upsert(db, "claude_model", body.claude_model)
+    if body.openai_api_key is not None:
+        _upsert(db, "openai_api_key", body.openai_api_key)
+    if body.openai_model is not None:
+        _upsert(db, "openai_model", body.openai_model)
+    if body.gemini_api_key is not None:
+        _upsert(db, "gemini_api_key", body.gemini_api_key)
+    if body.gemini_model is not None:
+        _upsert(db, "gemini_model", body.gemini_model)
     if body.local_ai_url is not None:
         _upsert(db, "local_ai_url", body.local_ai_url)
     if body.local_ai_model is not None:

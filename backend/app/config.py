@@ -14,11 +14,15 @@ class Settings(BaseSettings):
     # Allowed frontend origin for CORS (set to your frontend URL in production/Docker)
     frontend_origin: str = "http://localhost:5173"
 
-    # AI provider: "auto" tries local first then falls back to Claude
-    # "claude" forces Claude, "local" forces local (LM Studio / Ollama)
+    # AI provider: "auto" | "claude" | "openai" | "gemini" | "local"
+    # "auto" tries local first then falls back to Claude
     ai_provider: str = "auto"
     local_ai_url: str = "http://localhost:1234/v1"   # LM Studio default
     local_ai_model: str = ""                          # empty = auto-detect first model
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.0-flash"
 
 
 settings = Settings()
