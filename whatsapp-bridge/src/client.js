@@ -11,6 +11,7 @@ const client = new Client({
   }),
   puppeteer: {
     headless: true,
+    protocolTimeout: 60000,
     // When PUPPETEER_EXECUTABLE_PATH is set (e.g. in Docker), use system Chromium
     ...(process.env.PUPPETEER_EXECUTABLE_PATH && {
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
