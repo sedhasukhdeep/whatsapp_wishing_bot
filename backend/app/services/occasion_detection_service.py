@@ -92,6 +92,19 @@ def is_likely_occasion_message(text: str) -> bool:
     return bool(_OCCASION_PATTERN.search(text))
 
 
+_BIRTHDAY_KW = re.compile(r"\b(birthday|bday|b-day|born|geburtstag|complean|cumple)\b", re.IGNORECASE)
+_ANNIVERSARY_KW = re.compile(r"\b(anniversary|anni|anniversaire)\b", re.IGNORECASE)
+
+
+def _infer_occasion_type(text: str) -> str:
+    """Keyword-based occasion type — used for 1:1 chats where AI is not needed."""
+    if _BIRTHDAY_KW.search(text):
+        return "birthday"
+    if _ANNIVERSARY_KW.search(text):
+        return "anniversary"
+    return "custom"
+
+
 def _parse_detection_response(raw: str) -> dict | None:
     """Strip thinking tags and parse JSON from the AI response."""
     # Strip complete <think>...</think> blocks
@@ -438,55 +451,76 @@ async def _process_message_inner(
             phone = re.sub(r"\D", "", sender_jid.split("@")[0])
             resolved_sender = f"+{phone}" if phone else None
 
-    # Step 1: 1:1 chat — resolve contact directly by phone from JID
-    direct_contact = None
-    if not chat_id.endswith("@g.us") and not chat_id.endswith("@broadcast"):
+    fallback_dt = (
+        datetime.fromtimestamp(timestamp, tz=timezone.utc) if timestamp
+        else datetime.now(timezone.utc)
+    )
+
+    is_group = chat_id.endswith("@g.us") or chat_id.endswith("@broadcast")
+
+    if not is_group:
+        # ── Step 1: 1:1 chat — no AI needed ──────────────────────────────────
+        # The contact IS whoever we're talking to; resolve by phone from JID.
         direct_contact = resolve_contact_by_phone(chat_id, contacts)
-        if direct_contact:
-            logger.debug("1:1 chat: resolved contact %s from JID %s", direct_contact.name, chat_id)
+        if not direct_contact:
+            logger.debug("1:1 chat: no contact match for JID %s — skipping", chat_id)
+            return
 
-    result = await detect_occasion_from_message(body, contacts, db)
-
-    if not result and not forced_occasion:
-        return
-
-    if result:
-        detected_name = result.get("name", "").strip()
-        occasion_type = result.get("occasion_type", "custom")
-        occasion_label = result.get("occasion_label")
-        detected_month = result.get("month")
-        detected_day = result.get("day")
-        detected_year = result.get("year")
-        confidence = result.get("confidence", "medium")
-    else:
-        detected_name = ""
-        occasion_type = "custom"
+        occasion_type = _infer_occasion_type(body)
         occasion_label = None
-        detected_month = None
-        detected_day = None
+        detected_name = direct_contact.name
+        detected_month = fallback_dt.month
+        detected_day = fallback_dt.day
         detected_year = None
-        confidence = "low"
+        confidence = "high"
+        matched_contact_id = direct_contact.id
+        matched_contact = direct_contact
 
-    # Override occasion type/label from custom keyword if set
-    if forced_occasion:
-        occasion_type = forced_occasion.get("occasion_type", occasion_type)
-        if forced_occasion.get("label"):
-            occasion_label = forced_occasion["label"]
+        # Custom keyword overrides
+        if forced_occasion:
+            occasion_type = forced_occasion.get("occasion_type", occasion_type)
+            if forced_occasion.get("label"):
+                occasion_label = forced_occasion["label"]
 
-    # Date fallback: use message timestamp, or now() as last resort
-    if detected_month is None or detected_day is None:
-        fallback_dt = (
-            datetime.fromtimestamp(timestamp, tz=timezone.utc) if timestamp
-            else datetime.now(timezone.utc)
+        logger.info(
+            "1:1 detection (no AI): contact=%s, occasion=%s, date=%s-%s",
+            direct_contact.name, occasion_type, detected_month, detected_day,
         )
+
+    else:
+        # ── Step 2: Group chat — AI-driven single-message detection ───────────
+        result = await detect_occasion_from_message(body, contacts, db)
+
+        if not result and not forced_occasion:
+            return
+
+        if result:
+            detected_name = result.get("name", "").strip()
+            occasion_type = result.get("occasion_type", "custom")
+            occasion_label = result.get("occasion_label")
+            detected_month = result.get("month")
+            detected_day = result.get("day")
+            detected_year = result.get("year")
+            confidence = result.get("confidence", "medium")
+        else:
+            detected_name = ""
+            occasion_type = "custom"
+            occasion_label = None
+            detected_month = None
+            detected_day = None
+            detected_year = None
+            confidence = "low"
+
+        # Custom keyword overrides
+        if forced_occasion:
+            occasion_type = forced_occasion.get("occasion_type", occasion_type)
+            if forced_occasion.get("label"):
+                occasion_label = forced_occasion["label"]
+
+        # Date fallback: message timestamp
         detected_month = detected_month or fallback_dt.month
         detected_day = detected_day or fallback_dt.day
 
-    # Step 1 override: trust the direct phone resolution over AI guess
-    if direct_contact:
-        matched_contact_id = direct_contact.id
-        matched_contact = direct_contact
-    else:
         matched_contact_id = _validate_contact_id(result.get("matched_contact_id") if result else None, contacts)
         matched_contact = next((c for c in contacts if c.id == matched_contact_id), None)
 
