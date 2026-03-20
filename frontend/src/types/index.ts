@@ -12,6 +12,8 @@ export interface Contact {
   phone: string;
   relationship: RelationshipType;
   relationship_label: string | null;
+  alias: string | null;
+  use_alias_in_broadcast: boolean;
   notes: string | null;
   tone_preference: ToneType;
   language: string;
@@ -231,6 +233,7 @@ export interface BroadcastRecipient {
   contact_id: number | null;
   target_id: number | null;
   contact_name: string | null;
+  contact_display_name: string | null;
   target_name: string | null;
   sent_at: string | null;
   error: string | null;

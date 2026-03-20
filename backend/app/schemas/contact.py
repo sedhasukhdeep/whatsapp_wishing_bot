@@ -15,6 +15,8 @@ class ContactBase(BaseModel):
     phone: str
     relationship: RelationshipType
     relationship_label: str | None = None
+    alias: str | None = None
+    use_alias_in_broadcast: bool = False
     notes: str | None = None
     tone_preference: ToneType = "warm"
     language: str = "en"

@@ -58,6 +58,8 @@ export default function ContactFormPage() {
   const [language, setLanguage] = useState('en');
   const [length, setLength] = useState<LengthType>('medium');
   const [customInstructions, setCustomInstructions] = useState('');
+  const [alias, setAlias] = useState('');
+  const [useAliasInBroadcast, setUseAliasInBroadcast] = useState(false);
   const [whatsappChatId, setWhatsappChatId] = useState<string | null>(null);
   const [whatsappChatName, setWhatsappChatName] = useState<string | null>(null);
   const [occasions, setOccasions] = useState<Occasion[]>([]);
@@ -74,6 +76,8 @@ export default function ContactFormPage() {
         setRelationshipLabel(c.relationship_label ?? '');
         setNotes(c.notes ?? ''); setTone(c.tone_preference); setLanguage(c.language);
         setLength(c.message_length); setCustomInstructions(c.custom_instructions ?? '');
+        setAlias(c.alias ?? '');
+        setUseAliasInBroadcast(c.use_alias_in_broadcast);
         setWhatsappChatId(c.whatsapp_chat_id);
         setWhatsappChatName(c.whatsapp_chat_name);
         setOccasions(c.occasions);
@@ -92,6 +96,8 @@ export default function ContactFormPage() {
       const data = {
         name, phone, relationship,
         relationship_label: (relationship === 'other' && relationshipLabel) ? relationshipLabel : null,
+        alias: alias || null,
+        use_alias_in_broadcast: useAliasInBroadcast,
         notes: notes || null,
         tone_preference: tone,
         language,
@@ -138,6 +144,20 @@ export default function ContactFormPage() {
             <div>
               <label className="block text-sm font-medium mb-1">Name *</label>
               <Input value={name} onChange={(e) => setName(e.target.value)} required placeholder="e.g. Priya Sharma" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Alias <span className="text-muted-foreground font-normal">(nickname)</span></label>
+              <Input value={alias} onChange={(e) => setAlias(e.target.value)} placeholder="e.g. Maa, Bhai, Di..." />
+              {alias && (
+                <label className="flex items-center gap-2 mt-2 cursor-pointer text-sm">
+                  <input
+                    type="checkbox"
+                    checked={useAliasInBroadcast}
+                    onChange={(e) => setUseAliasInBroadcast(e.target.checked)}
+                  />
+                  Use alias instead of name in broadcast messages
+                </label>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Phone * (international format)</label>

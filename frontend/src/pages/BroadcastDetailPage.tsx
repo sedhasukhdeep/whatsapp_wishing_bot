@@ -158,8 +158,9 @@ export default function BroadcastDetailPage() {
           <p className="text-xs text-muted-foreground">
             Use <code className="bg-muted px-1 rounded">{'{name}'}</code> to insert each recipient's first name.
             {messageText.includes('{name}') && broadcast.recipients.length > 0 && (() => {
-              const firstName = (broadcast.recipients[0].contact_name ?? '').split(' ')[0] || 'Friend';
-              return <span className="ml-1 text-emerald-600 dark:text-emerald-400">Preview: "{messageText.replace(/\{name\}/g, firstName)}"</span>;
+              const first = broadcast.recipients[0];
+              const displayName = first.contact_display_name || (first.contact_name ?? '').split(' ')[0] || 'Friend';
+              return <span className="ml-1 text-emerald-600 dark:text-emerald-400">Preview: "{messageText.replace(/\{name\}/g, displayName)}"</span>;
             })()}
           </p>
           <div className="flex gap-2">
@@ -211,6 +212,9 @@ export default function BroadcastDetailPage() {
                     <TableRow key={r.id}>
                       <TableCell className="font-medium">
                         {r.contact_name || r.target_name || '—'}
+                        {r.contact_display_name && r.contact_display_name !== r.contact_name?.split(' ')[0] && (
+                          <span className="ml-2 text-xs text-muted-foreground">({r.contact_display_name})</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs">{r.recipient_type}</Badge>

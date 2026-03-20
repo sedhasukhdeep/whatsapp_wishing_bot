@@ -19,6 +19,8 @@ class Contact(Base):
     language: Mapped[str] = mapped_column(String(10), nullable=False, default="en")
     message_length: Mapped[str] = mapped_column(String(10), nullable=False, default="medium")
     custom_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    alias: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    use_alias_in_broadcast: Mapped[bool] = mapped_column(nullable=False, default=False)
     relationship_label: Mapped[str | None] = mapped_column(String(100), nullable=True)
     whatsapp_chat_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     whatsapp_chat_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
