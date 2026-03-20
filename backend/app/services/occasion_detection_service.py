@@ -16,12 +16,16 @@ import asyncio
 import json
 import logging
 import re
+import threading
 from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
 
-# Prevents concurrent AI calls — local LLMs handle one request at a time
-_ai_semaphore = asyncio.Semaphore(1)
+# Prevents concurrent AI calls — local LLMs handle one request at a time.
+# threading.Lock instead of asyncio.Semaphore so it works across the scan
+# thread (own event loop) and the FastAPI event loop without either
+# sneaking past the other's lock.
+_ai_lock = threading.Lock()
 
 # Prevents the same message_id being processed twice concurrently
 # (e.g. if the bridge fires both 'message' and 'message_create' for the same msg)
@@ -209,8 +213,11 @@ async def detect_occasion_from_message(text: str, contacts: list, db) -> dict | 
     logger.info("Detection user prompt:\n%s", user_message)
 
     try:
-        async with _ai_semaphore:
+        await asyncio.get_running_loop().run_in_executor(None, _ai_lock.acquire)
+        try:
             raw = await call_ai_raw(DETECTION_SYSTEM_PROMPT, user_message, db=db, max_tokens=600)
+        finally:
+            _ai_lock.release()
     except Exception as e:
         logger.warning("Occasion detection: AI call failed (%s) — skipping", e)
         return None
@@ -287,8 +294,11 @@ async def analyze_group_context_window(
     )
 
     try:
-        async with _ai_semaphore:
+        await asyncio.get_running_loop().run_in_executor(None, _ai_lock.acquire)
+        try:
             raw = await call_ai_raw(GROUP_CONTEXT_SYSTEM_PROMPT, user_message, db=db, max_tokens=600)
+        finally:
+            _ai_lock.release()
     except Exception as e:
         logger.warning("Group context analysis: AI call failed (%s) — skipping", e)
         return None
