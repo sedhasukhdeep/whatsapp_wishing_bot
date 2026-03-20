@@ -157,7 +157,9 @@ async def _do_send(broadcast_id: int, message_text: str) -> None:
         for r in recipients:
             try:
                 if r.recipient_type == "contact" and r.contact and r.contact.whatsapp_chat_id:
-                    await send_whatsapp_message(r.contact.whatsapp_chat_id, message_text)
+                    name = (r.contact.name or "").split()[0]  # first name only
+                    personalized = message_text.replace("{name}", name)
+                    await send_whatsapp_message(r.contact.whatsapp_chat_id, personalized)
                 elif r.recipient_type == "target" and r.target:
                     await send_whatsapp_message(r.target.chat_id, message_text)
                 else:

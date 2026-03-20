@@ -153,8 +153,15 @@ export default function BroadcastDetailPage() {
             rows={5}
             disabled={isSent}
             className="resize-y text-sm"
-            placeholder="Write your message or use AI to generate one..."
+            placeholder="Write your message or use AI to generate one. Use {name} to personalise per recipient."
           />
+          <p className="text-xs text-muted-foreground">
+            Use <code className="bg-muted px-1 rounded">{'{name}'}</code> to insert each recipient's first name.
+            {messageText.includes('{name}') && broadcast.recipients.length > 0 && (() => {
+              const firstName = (broadcast.recipients[0].contact_name ?? '').split(' ')[0] || 'Friend';
+              return <span className="ml-1 text-emerald-600 dark:text-emerald-400">Preview: "{messageText.replace(/\{name\}/g, firstName)}"</span>;
+            })()}
+          </p>
           <div className="flex gap-2">
             <Button
               variant="outline"
