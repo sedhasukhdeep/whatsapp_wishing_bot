@@ -11,7 +11,7 @@ router.get('/wa-contacts', async (_req, res) => {
   try {
     const contacts = await client.getContacts();
     const result = contacts
-      .filter(c => c.isMyContact && !c.isGroup && c.isUser && c.number)
+      .filter(c => c.isMyContact && !c.isGroup && c.isUser && c.number && !c.id._serialized.endsWith('@lid'))
       .map(c => ({
         phone: '+' + c.number,
         name: c.name || c.pushname || c.number,
@@ -22,11 +22,21 @@ router.get('/wa-contacts', async (_req, res) => {
 
     // Remove phantom +1 variants (e.g. +161412345678 when +61412345678 exists)
     const phones = new Set(deduped.map(c => c.phone));
-    return res.json(
-      deduped.filter(c =>
-        !(c.phone.startsWith('+1') && phones.has('+' + c.phone.slice(2)))
-      )
+    const final = deduped.filter(c =>
+      !(c.phone.startsWith('+1') && phones.has('+' + c.phone.slice(2)))
     );
+
+    console.log('[WA] raw contacts:', result.length,
+      '→ after exact dedup:', deduped.length,
+      '→ after phantom+1 dedup:', final.length);
+    const removed = deduped.filter(c =>
+      c.phone.startsWith('+1') && phones.has('+' + c.phone.slice(2))
+    );
+    if (removed.length) {
+      console.log('[WA] removed phantom+1:', removed.map(c => c.phone));
+    }
+
+    return res.json(final);
   } catch (err) {
     console.error('[WA] getContacts error:', err);
     return res.status(500).json({ error: err.message });
