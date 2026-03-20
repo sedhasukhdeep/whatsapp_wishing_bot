@@ -1,9 +1,12 @@
+import asyncio
 import logging
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
-from app.database import get_db
+from app.database import SessionLocal, get_db
 from app.models.detected_occasion import DetectedOccasion
 from app.models.occasion import Occasion
 from app.models.whatsapp_target import WhatsAppTarget
@@ -12,6 +15,9 @@ from app.schemas.occasion import OccasionOut
 
 router = APIRouter(prefix="/api/detections", tags=["detections"])
 logger = logging.getLogger(__name__)
+
+# In-memory scan state (single-user personal bot — no need for persistence)
+_scan_state: dict = {"running": False, "scanned": 0, "detected": 0, "total": 0, "error": None}
 
 
 @router.get("", response_model=list[DetectedOccasionOut])
@@ -108,3 +114,77 @@ def dismiss_detection(detection_id: int, db: Session = Depends(get_db)):
     detection.status = "dismissed"
     db.commit()
     return {"ok": True}
+
+
+# ── Historical scan ───────────────────────────────────────────────────────────
+
+class ScanHistoryRequest(BaseModel):
+    chat_ids: Optional[list[str]] = None  # None = all chats
+    limit_per_chat: int = 200
+
+
+async def _run_scan(chat_ids: list[str], limit_per_chat: int) -> None:
+    """Background task: fetch messages from each chat and run detection."""
+    from app.services.whatsapp_service import get_chat_messages
+    from app.services.occasion_detection_service import process_message_for_occasion
+
+    global _scan_state
+    _scan_state.update({"running": True, "scanned": 0, "detected": 0, "total": len(chat_ids), "error": None})
+
+    for chat_id in chat_ids:
+        if not _scan_state["running"]:
+            break
+        db = SessionLocal()
+        try:
+            messages = await get_chat_messages(chat_id, limit=limit_per_chat)
+            before = db.query(DetectedOccasion).count()
+            for msg in messages:
+                try:
+                    await process_message_for_occasion(chat_id, msg["id"], msg["body"], db)
+                except Exception:
+                    logger.exception("Detection error on message %s", msg.get("id"))
+            after = db.query(DetectedOccasion).count()
+            _scan_state["detected"] += after - before
+            _scan_state["scanned"] += 1
+        except Exception as e:
+            logger.warning("Could not fetch messages from chat %s: %s", chat_id, e)
+            _scan_state["scanned"] += 1
+        finally:
+            db.close()
+
+    _scan_state["running"] = False
+    logger.info(
+        "History scan complete: %d chats, %d new detections",
+        _scan_state["total"], _scan_state["detected"],
+    )
+
+
+@router.get("/scan-status")
+def scan_status():
+    """Return the current state of a history scan."""
+    return _scan_state
+
+
+@router.post("/scan-history")
+async def scan_history(body: ScanHistoryRequest, background_tasks: BackgroundTasks):
+    """
+    Start a background scan of historical WhatsApp messages for occasion detection.
+    If chat_ids is omitted, scans all available chats.
+    """
+    global _scan_state
+    if _scan_state["running"]:
+        raise HTTPException(status_code=409, detail="A scan is already running")
+
+    from app.services.whatsapp_service import get_wa_chats
+
+    if body.chat_ids:
+        chat_ids = body.chat_ids
+    else:
+        chats = await get_wa_chats()
+        chat_ids = [c["id"] for c in chats]
+
+    if not chat_ids:
+        raise HTTPException(status_code=400, detail="No chats available to scan")
+
+    background_tasks.add_task(_run_scan, chat_ids, body.limit_per_chat)
+    return {"status": "started", "total_chats": len(chat_ids)}

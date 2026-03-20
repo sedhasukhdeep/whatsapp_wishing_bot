@@ -9,6 +9,7 @@ const sendRouter = require('./routes/send');
 const chatsRouter = require('./routes/chats');
 const sendGifRouter = require('./routes/send_gif');
 const contactsRouter = require('./routes/contacts');
+const messagesRouter = require('./routes/messages');
 
 const PORT = process.env.PORT || 3001;
 // In Docker, bind to all interfaces; otherwise localhost-only for security
@@ -21,6 +22,7 @@ app.use(sendRouter);
 app.use(chatsRouter);
 app.use(sendGifRouter);
 app.use(contactsRouter);
+app.use(messagesRouter);
 
 app.listen(PORT, HOST, () => {
   console.log(`[Bridge] Listening on http://${HOST}:${PORT}`);

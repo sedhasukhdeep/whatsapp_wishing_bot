@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { confirmDetection, dismissDetection, listContacts, listDetections } from '../api/client';
+import { useEffect, useRef, useState } from 'react';
+import { confirmDetection, dismissDetection, getScanStatus, listContacts, listDetections, startScanHistory } from '../api/client';
 import type { Contact, DetectedOccasion, DetectionConfirmRequest, OccasionType } from '../types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Loader2, Radar, X } from 'lucide-react';
+import { History, Loader2, Radar, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const MONTHS = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -56,13 +56,53 @@ export default function DetectionsPage() {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [dismissing, setDismissing] = useState<number | null>(null);
 
+  // Scan history state
+  const [scanStatus, setScanStatus] = useState<{ running: boolean; scanned: number; detected: number; total: number; error: string | null } | null>(null);
+  const [scanError, setScanError] = useState('');
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
-    Promise.all([listDetections(), listContacts()]).then(([d, c]) => {
+    Promise.all([listDetections(), listContacts(), getScanStatus()]).then(([d, c, s]) => {
       setDetections(d);
       setContacts(c);
+      setScanStatus(s);
+      if (s.running) startPolling();
       setLoading(false);
     });
+    return () => stopPolling();
   }, []);
+
+  function startPolling() {
+    if (pollRef.current) return;
+    pollRef.current = setInterval(async () => {
+      const s = await getScanStatus();
+      setScanStatus(s);
+      if (!s.running) {
+        stopPolling();
+        // Refresh detections list after scan completes
+        listDetections().then(setDetections);
+      }
+    }, 2000);
+  }
+
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
+
+  async function handleScanHistory() {
+    setScanError('');
+    try {
+      await startScanHistory();
+      const s = await getScanStatus();
+      setScanStatus(s);
+      startPolling();
+    } catch (err: unknown) {
+      setScanError(err instanceof Error ? err.message : 'Failed to start scan');
+    }
+  }
 
   function openConfirm(d: DetectedOccasion) {
     setConfirmState({
@@ -138,7 +178,7 @@ export default function DetectionsPage() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Radar size={24} />
@@ -148,12 +188,59 @@ export default function DetectionsPage() {
             Occasions detected from incoming WhatsApp messages. Review and confirm to add them to contacts.
           </p>
         </div>
-        {detections.length > 0 && (
-          <Badge className="text-sm px-3 py-1 bg-primary text-primary-foreground">
-            {detections.length} pending
-          </Badge>
-        )}
+        <div className="flex items-center gap-3">
+          {detections.length > 0 && (
+            <Badge className="text-sm px-3 py-1 bg-primary text-primary-foreground">
+              {detections.length} pending
+            </Badge>
+          )}
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleScanHistory}
+            disabled={scanStatus?.running}
+          >
+            {scanStatus?.running
+              ? <Loader2 size={16} className="animate-spin" />
+              : <History size={16} />}
+            {scanStatus?.running ? 'Scanning…' : 'Scan History'}
+          </Button>
+        </div>
       </div>
+
+      {/* Scan progress */}
+      {scanStatus?.running && (
+        <Card className="mb-4 border-primary/30 bg-primary/5">
+          <CardContent className="py-3 px-4">
+            <div className="flex items-center justify-between text-sm mb-1.5">
+              <span className="font-medium">Scanning chat history…</span>
+              <span className="text-muted-foreground">
+                {scanStatus.scanned} / {scanStatus.total} chats · {scanStatus.detected} new
+              </span>
+            </div>
+            <div className="w-full bg-muted rounded-full h-1.5">
+              <div
+                className="bg-primary h-1.5 rounded-full transition-all"
+                style={{ width: `${scanStatus.total > 0 ? (scanStatus.scanned / scanStatus.total) * 100 : 0}%` }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Scan complete summary */}
+      {scanStatus && !scanStatus.running && scanStatus.total > 0 && (
+        <Card className="mb-4 border-emerald-500/30 bg-emerald-50 dark:bg-emerald-900/10">
+          <CardContent className="py-3 px-4 text-sm text-emerald-700 dark:text-emerald-400">
+            Scan complete — {scanStatus.total} chat{scanStatus.total !== 1 ? 's' : ''} scanned,{' '}
+            {scanStatus.detected} new detection{scanStatus.detected !== 1 ? 's' : ''} found.
+          </CardContent>
+        </Card>
+      )}
+
+      {scanError && (
+        <div className="mb-4 rounded-md bg-destructive/10 text-destructive text-sm p-3">{scanError}</div>
+      )}
 
       {detections.length === 0 ? (
         <Card>

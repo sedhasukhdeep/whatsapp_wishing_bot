@@ -200,3 +200,14 @@ export const confirmDetection = (id: number, data: DetectionConfirmRequest) =>
 
 export const dismissDetection = (id: number) =>
   api.post(`/api/detections/${id}/dismiss`);
+
+export const getScanStatus = () =>
+  api.get<{ running: boolean; scanned: number; detected: number; total: number; error: string | null }>(
+    '/api/detections/scan-status'
+  ).then((r) => r.data);
+
+export const startScanHistory = (chat_ids?: string[], limit_per_chat = 200) =>
+  api.post<{ status: string; total_chats: number }>('/api/detections/scan-history', {
+    chat_ids: chat_ids ?? null,
+    limit_per_chat,
+  }).then((r) => r.data);
