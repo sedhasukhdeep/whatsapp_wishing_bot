@@ -96,18 +96,31 @@ def _parse_detection_response(raw: str) -> dict | None:
         return None
 
 
-def _build_contacts_context(contacts: list) -> str:
-    """Format contacts list for the AI prompt."""
+def _build_contacts_context(contacts: list, max_chars: int = 5000) -> str:
+    """
+    Format contacts list for the AI prompt, capped at max_chars to stay within
+    the 4000-token budget. Truncated contacts are noted so the AI knows the list
+    may be incomplete.
+    """
     if not contacts:
         return "No contacts available."
     lines = ["Contacts:"]
+    used = len("Contacts:\n")
+    skipped = 0
     for c in contacts:
         parts = [f"- ID {c.id}: {c.name} ({c.relationship})"]
         if c.alias:
             parts.append(f"alias: {c.alias}")
         if c.notes:
-            parts.append(f"notes: {c.notes[:80]}")
-        lines.append(" | ".join(parts))
+            parts.append(f"notes: {c.notes[:60]}")
+        line = " | ".join(parts)
+        if used + len(line) + 1 > max_chars:
+            skipped += 1
+        else:
+            lines.append(line)
+            used += len(line) + 1
+    if skipped:
+        lines.append(f"({skipped} more contacts omitted to fit token limit)")
     return "\n".join(lines)
 
 
@@ -162,7 +175,7 @@ async def detect_occasion_from_message(text: str, contacts: list, db) -> dict | 
     user_message = f"{contacts_context}\n\nMessage: {text}"
 
     try:
-        raw = await call_ai_raw(DETECTION_SYSTEM_PROMPT, user_message, db=db, max_tokens=250)
+        raw = await call_ai_raw(DETECTION_SYSTEM_PROMPT, user_message, db=db, max_tokens=200)
     except Exception as e:
         logger.warning("Occasion detection: AI call failed (%s) — skipping", e)
         return None
@@ -198,8 +211,11 @@ async def analyze_group_context_window(
             if len(phone_digits) >= 7:
                 jid_to_contact[f"{phone_digits}@c.us"] = contact
 
-    # Format messages
+    # Format messages, capped at 6000 chars to stay within token budget
+    MAX_MSG_CHARS = 6000
     msg_lines = []
+    total_msg_chars = 0
+    truncated = 0
     for m in messages:
         author = m.get("author")
         if m.get("from_me"):
@@ -210,14 +226,21 @@ async def analyze_group_context_window(
             label = author
         else:
             label = "unknown"
-        msg_lines.append(f"[{label}]: {m['body']}")
+        line = f"[{label}]: {m['body']}"
+        if total_msg_chars + len(line) + 1 > MAX_MSG_CHARS:
+            truncated += 1
+        else:
+            msg_lines.append(line)
+            total_msg_chars += len(line) + 1
+    if truncated:
+        msg_lines.append(f"({truncated} more messages omitted)")
 
     window_date = ""
     if messages[0].get("timestamp"):
         dt = datetime.fromtimestamp(messages[0]["timestamp"], tz=timezone.utc)
         window_date = f" ({dt.strftime('%Y-%m-%d')})"
 
-    contacts_context = _build_contacts_context(contacts)
+    contacts_context = _build_contacts_context(contacts, max_chars=3000)
     user_message = (
         f"{contacts_context}\n\n"
         f"Group messages{window_date}:\n"
@@ -225,7 +248,7 @@ async def analyze_group_context_window(
     )
 
     try:
-        raw = await call_ai_raw(GROUP_CONTEXT_SYSTEM_PROMPT, user_message, db=db, max_tokens=300)
+        raw = await call_ai_raw(GROUP_CONTEXT_SYSTEM_PROMPT, user_message, db=db, max_tokens=200)
     except Exception as e:
         logger.warning("Group context analysis: AI call failed (%s) — skipping", e)
         return None
