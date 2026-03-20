@@ -1,5 +1,6 @@
 import httpx
 from fastapi import HTTPException
+from urllib.parse import quote
 
 from app.config import settings
 
@@ -81,7 +82,7 @@ async def get_group_members(group_id: str) -> dict:
     """Fetch group participants from the bridge. Returns {group_name, participants: [{jid, phone}]}."""
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.get(f"{settings.wa_bridge_url}/group-members/{group_id}")
+            resp = await client.get(f"{settings.wa_bridge_url}/group-members/{quote(group_id, safe='')}")
             if resp.status_code == 503:
                 raise HTTPException(status_code=503, detail="WhatsApp not connected — scan QR code first")
             if resp.status_code == 404:
