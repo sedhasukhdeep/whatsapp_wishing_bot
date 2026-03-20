@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { deleteContact, getWaSyncPreview, importWaContacts, listContacts } from '../api/client';
+import { deleteAllContacts, deleteContact, getWaSyncPreview, importWaContacts, listContacts } from '../api/client';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import type { Contact, RelationshipType, WaSyncImportItem, WaSyncPreviewItem } from '../types';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Smartphone, Upload, UserPlus, Users } from 'lucide-react';
+import { Loader2, Smartphone, Trash2, Upload, UserPlus, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const RELATIONSHIPS: RelationshipType[] = ['family', 'friend', 'colleague', 'acquaintance', 'other'];
@@ -39,6 +39,7 @@ export default function ContactsPage() {
   const [search, setSearch] = useState('');
   const [rel, setRel] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<Contact | null>(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const nav = useNavigate();
 
   // Sync dialog state
@@ -59,6 +60,12 @@ export default function ContactsPage() {
     await deleteContact(c.id);
     setContacts((prev) => prev.filter((x) => x.id !== c.id));
     setConfirmDelete(null);
+  }
+
+  async function handleDeleteAll() {
+    await deleteAllContacts();
+    setContacts([]);
+    setConfirmDeleteAll(false);
   }
 
   async function openSyncDialog() {
@@ -133,6 +140,16 @@ export default function ContactsPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Contacts</h1>
         <div className="flex gap-2">
+          {contacts.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => setConfirmDeleteAll(true)}
+              className="gap-2 text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 size={16} />
+              Delete All
+            </Button>
+          )}
           <Button variant="outline" onClick={openSyncDialog} className="gap-2">
             <Smartphone size={16} />
             Sync WhatsApp
@@ -230,6 +247,14 @@ export default function ContactsPage() {
           message={`Delete ${confirmDelete.name}? This will also remove all their occasions and drafts.`}
           onConfirm={() => handleDelete(confirmDelete)}
           onCancel={() => setConfirmDelete(null)}
+        />
+      )}
+
+      {confirmDeleteAll && (
+        <ConfirmDialog
+          message={`Delete all ${contacts.length} contact${contacts.length !== 1 ? 's' : ''}? This will also remove all their occasions and drafts. This cannot be undone.`}
+          onConfirm={handleDeleteAll}
+          onCancel={() => setConfirmDeleteAll(false)}
         />
       )}
 

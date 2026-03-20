@@ -18,7 +18,15 @@ router.get('/wa-contacts', async (_req, res) => {
         chat_id: c.id._serialized,
       }));
     const seen = new Set();
-    return res.json(result.filter(c => seen.has(c.phone) ? false : seen.add(c.phone)));
+    const deduped = result.filter(c => seen.has(c.phone) ? false : seen.add(c.phone));
+
+    // Remove phantom +1 variants (e.g. +161412345678 when +61412345678 exists)
+    const phones = new Set(deduped.map(c => c.phone));
+    return res.json(
+      deduped.filter(c =>
+        !(c.phone.startsWith('+1') && phones.has('+' + c.phone.slice(2)))
+      )
+    );
   } catch (err) {
     console.error('[WA] getContacts error:', err);
     return res.status(500).json({ error: err.message });

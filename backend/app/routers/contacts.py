@@ -62,6 +62,13 @@ async def wa_sync_import(body: WaSyncImportRequest, db: Session = Depends(get_db
     return WaSyncImportResult(created=created, skipped=skipped)
 
 
+@router.delete("", status_code=200)
+def delete_all_contacts(db: Session = Depends(get_db)):
+    deleted = db.query(Contact).delete()
+    db.commit()
+    return {"deleted": deleted}
+
+
 @router.get("", response_model=list[ContactOut])
 def list_contacts(search: str = "", relationship: str = "", db: Session = Depends(get_db)):
     q = db.query(Contact)

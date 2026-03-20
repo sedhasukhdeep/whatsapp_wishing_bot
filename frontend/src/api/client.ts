@@ -60,6 +60,9 @@ export const updateContact = (id: number, data: Omit<Contact, 'id' | 'created_at
 
 export const deleteContact = (id: number) => api.delete(`/api/contacts/${id}`);
 
+export const deleteAllContacts = () =>
+  api.delete<{ deleted: number }>('/api/contacts').then((r) => r.data);
+
 export const getWaSyncPreview = () =>
   api.get<WaSyncPreviewItem[]>('/api/contacts/wa-sync/preview').then((r) => r.data);
 
