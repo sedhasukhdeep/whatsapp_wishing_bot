@@ -55,3 +55,4 @@ class WAWebhookPayload(BaseModel):
     body: str
     message_id: str
     timestamp: int | None = None  # Unix timestamp from the bridge
+    author: str | None = None  # Sender JID for group messages (null for 1:1 chats)

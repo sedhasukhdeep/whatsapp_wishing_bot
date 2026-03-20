@@ -30,6 +30,7 @@ router.get('/messages/:chatId', async (req, res) => {
         body: m.body,
         timestamp: m.timestamp,
         from_me: m.fromMe,
+        author: m.author || null, // sender JID in group chats (null for DMs)
       }));
 
     return res.json(result);

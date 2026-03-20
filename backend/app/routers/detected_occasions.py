@@ -124,9 +124,17 @@ class ScanHistoryRequest(BaseModel):
 
 
 async def _run_scan(chat_ids: list[str], limit_per_chat: int) -> None:
-    """Background task: fetch messages from each chat and run detection."""
+    """
+    Background task: fetch messages from each chat and run detection.
+
+    Group chats (@g.us): processed as daily context windows with thank-you pattern detection.
+    1:1 chats (@c.us):  processed message-by-message with direct phone-based contact resolution.
+    """
     from app.services.whatsapp_service import get_chat_messages
-    from app.services.occasion_detection_service import process_message_for_occasion
+    from app.services.occasion_detection_service import (
+        process_message_for_occasion,
+        scan_group_chat_for_occasions,
+    )
 
     global _scan_state
     _scan_state.update({"running": True, "scanned": 0, "detected": 0, "total": len(chat_ids), "error": None})
@@ -138,14 +146,21 @@ async def _run_scan(chat_ids: list[str], limit_per_chat: int) -> None:
         try:
             messages = await get_chat_messages(chat_id, limit=limit_per_chat)
             before = db.query(DetectedOccasion).count()
-            for msg in messages:
-                try:
-                    await process_message_for_occasion(
-                        chat_id, msg["id"], msg["body"], db,
-                        timestamp=msg.get("timestamp"),
-                    )
-                except Exception:
-                    logger.exception("Detection error on message %s", msg.get("id"))
+
+            if chat_id.endswith("@g.us"):
+                # Group chat: daily context-window analysis (thank-you pattern)
+                await scan_group_chat_for_occasions(chat_id, messages, db)
+            else:
+                # 1:1 chat: message-by-message with direct phone resolution
+                for msg in messages:
+                    try:
+                        await process_message_for_occasion(
+                            chat_id, msg["id"], msg["body"], db,
+                            timestamp=msg.get("timestamp"),
+                        )
+                    except Exception:
+                        logger.exception("Detection error on message %s", msg.get("id"))
+
             after = db.query(DetectedOccasion).count()
             _scan_state["detected"] += after - before
             _scan_state["scanned"] += 1
