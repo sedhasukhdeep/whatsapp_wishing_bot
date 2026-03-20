@@ -1,9 +1,10 @@
 import asyncio
 import json
 import logging
+import threading
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
@@ -179,6 +180,19 @@ class ScanHistoryRequest(BaseModel):
     limit_per_chat: int = 200
 
 
+def _start_scan_thread(chat_ids: list[str], limit_per_chat: int) -> None:
+    """
+    Run the async scan in a dedicated thread with its own event loop.
+    This keeps the FastAPI event loop completely free — blocking sync DB
+    calls inside the scan cannot stall HTTP request handling or SIGTERM.
+    """
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(_run_scan(chat_ids, limit_per_chat))
+    finally:
+        loop.close()
+
+
 async def _run_scan(chat_ids: list[str], limit_per_chat: int) -> None:
     """
     Background task: fetch messages from each chat and run detection.
@@ -235,9 +249,10 @@ def scan_status():
 
 
 @router.post("/scan-history")
-async def scan_history(body: ScanHistoryRequest, background_tasks: BackgroundTasks):
+async def scan_history(body: ScanHistoryRequest):
     """
     Start a background scan of historical WhatsApp messages for occasion detection.
+    Runs in a dedicated daemon thread so the FastAPI event loop stays unblocked.
     If chat_ids is omitted, scans all available chats.
     """
     global _scan_state
@@ -255,5 +270,6 @@ async def scan_history(body: ScanHistoryRequest, background_tasks: BackgroundTas
     if not chat_ids:
         raise HTTPException(status_code=400, detail="No chats available to scan")
 
-    background_tasks.add_task(_run_scan, chat_ids, body.limit_per_chat)
+    t = threading.Thread(target=_start_scan_thread, args=(chat_ids, body.limit_per_chat), daemon=True)
+    t.start()
     return {"status": "started", "total_chats": len(chat_ids)}
