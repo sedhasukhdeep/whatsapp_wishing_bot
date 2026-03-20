@@ -69,3 +69,27 @@ class ContactOut(ContactBase):
 
 class ContactWithOccasions(ContactOut):
     occasions: list[OccasionOut] = []
+
+
+class WaSyncPreviewItem(BaseModel):
+    phone: str
+    name: str
+    chat_id: str
+    already_exists: bool
+    existing_contact_id: int | None = None
+
+
+class WaSyncImportItem(BaseModel):
+    phone: str
+    name: str
+    chat_id: str
+    relationship: RelationshipType
+
+
+class WaSyncImportRequest(BaseModel):
+    items: list[WaSyncImportItem]
+
+
+class WaSyncImportResult(BaseModel):
+    created: int
+    skipped: int

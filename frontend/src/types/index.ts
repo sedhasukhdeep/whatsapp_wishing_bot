@@ -245,3 +245,19 @@ export interface BroadcastRecipient {
 export interface BroadcastWithRecipients extends Broadcast {
   recipients: BroadcastRecipient[];
 }
+
+// WhatsApp Contact Sync
+export interface WaSyncPreviewItem {
+  phone: string;
+  name: string;
+  chat_id: string;
+  already_exists: boolean;
+  existing_contact_id: number | null;
+}
+
+export interface WaSyncImportItem {
+  phone: string;
+  name: string;
+  chat_id: string;
+  relationship: RelationshipType;
+}

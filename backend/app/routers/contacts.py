@@ -5,9 +5,61 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.models import Contact
-from app.schemas.contact import ContactCreate, ContactOut, ContactUpdate, ContactWithOccasions
+from app.schemas.contact import (
+    ContactCreate,
+    ContactOut,
+    ContactUpdate,
+    ContactWithOccasions,
+    WaSyncImportRequest,
+    WaSyncImportResult,
+    WaSyncPreviewItem,
+)
+from app.services.whatsapp_service import get_wa_contacts
 
 router = APIRouter(prefix="/api/contacts", tags=["contacts"])
+
+
+@router.get("/wa-sync/preview", response_model=list[WaSyncPreviewItem])
+async def wa_sync_preview(db: Session = Depends(get_db)):
+    wa_contacts = await get_wa_contacts()
+    existing = db.query(Contact.phone, Contact.id).all()
+    existing_phones = {row.phone: row.id for row in existing}
+    result = []
+    for c in wa_contacts:
+        already_exists = c["phone"] in existing_phones
+        result.append(
+            WaSyncPreviewItem(
+                phone=c["phone"],
+                name=c["name"],
+                chat_id=c["chat_id"],
+                already_exists=already_exists,
+                existing_contact_id=existing_phones.get(c["phone"]),
+            )
+        )
+    return result
+
+
+@router.post("/wa-sync/import", response_model=WaSyncImportResult)
+async def wa_sync_import(body: WaSyncImportRequest, db: Session = Depends(get_db)):
+    existing_phones = {row.phone for row in db.query(Contact.phone).all()}
+    created = 0
+    skipped = 0
+    for item in body.items:
+        if item.phone in existing_phones:
+            skipped += 1
+            continue
+        contact = Contact(
+            name=item.name,
+            phone=item.phone,
+            relationship=item.relationship,
+            whatsapp_chat_id=item.chat_id,
+            whatsapp_chat_name=item.name,
+        )
+        db.add(contact)
+        existing_phones.add(item.phone)
+        created += 1
+    db.commit()
+    return WaSyncImportResult(created=created, skipped=skipped)
 
 
 @router.get("", response_model=list[ContactOut])

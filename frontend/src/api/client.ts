@@ -18,6 +18,8 @@ import type {
   DraftHistoryItem,
   MessageDraft,
   Occasion,
+  WaSyncImportItem,
+  WaSyncPreviewItem,
   WhatsAppTarget,
 } from '../types';
 
@@ -57,6 +59,12 @@ export const updateContact = (id: number, data: Omit<Contact, 'id' | 'created_at
   api.put<Contact>(`/api/contacts/${id}`, data).then((r) => r.data);
 
 export const deleteContact = (id: number) => api.delete(`/api/contacts/${id}`);
+
+export const getWaSyncPreview = () =>
+  api.get<WaSyncPreviewItem[]>('/api/contacts/wa-sync/preview').then((r) => r.data);
+
+export const importWaContacts = (items: WaSyncImportItem[]) =>
+  api.post<{ created: number; skipped: number }>('/api/contacts/wa-sync/import', { items }).then((r) => r.data);
 
 // Occasions
 export const listOccasions = (contactId: number) =>

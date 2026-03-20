@@ -1,13 +1,27 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { deleteContact, listContacts } from '../api/client';
+import { deleteContact, getWaSyncPreview, importWaContacts, listContacts } from '../api/client';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
-import type { Contact, RelationshipType } from '../types';
+import type { Contact, RelationshipType, WaSyncImportItem, WaSyncPreviewItem } from '../types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Upload, UserPlus, Users } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Loader2, Smartphone, Upload, UserPlus, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const RELATIONSHIPS: RelationshipType[] = ['family', 'friend', 'colleague', 'acquaintance', 'other'];
@@ -27,6 +41,16 @@ export default function ContactsPage() {
   const [confirmDelete, setConfirmDelete] = useState<Contact | null>(null);
   const nav = useNavigate();
 
+  // Sync dialog state
+  const [syncOpen, setSyncOpen] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncError, setSyncError] = useState('');
+  const [syncPreview, setSyncPreview] = useState<WaSyncPreviewItem[]>([]);
+  const [syncChecked, setSyncChecked] = useState<Set<string>>(new Set());
+  const [syncRels, setSyncRels] = useState<Record<string, RelationshipType>>({});
+  const [syncImporting, setSyncImporting] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ created: number; skipped: number } | null>(null);
+
   useEffect(() => {
     listContacts(search, rel).then(setContacts);
   }, [search, rel]);
@@ -37,11 +61,82 @@ export default function ContactsPage() {
     setConfirmDelete(null);
   }
 
+  async function openSyncDialog() {
+    setSyncOpen(true);
+    setSyncLoading(true);
+    setSyncError('');
+    setSyncPreview([]);
+    setSyncResult(null);
+    try {
+      const preview = await getWaSyncPreview();
+      setSyncPreview(preview);
+      const newPhones = new Set(preview.filter((p) => !p.already_exists).map((p) => p.phone));
+      setSyncChecked(newPhones);
+      const rels: Record<string, RelationshipType> = {};
+      preview.forEach((p) => { rels[p.phone] = 'friend'; });
+      setSyncRels(rels);
+    } catch (err: unknown) {
+      setSyncError(err instanceof Error ? err.message : 'Failed to load WhatsApp contacts');
+    } finally {
+      setSyncLoading(false);
+    }
+  }
+
+  function toggleAll() {
+    const newPhones = syncPreview.filter((p) => !p.already_exists).map((p) => p.phone);
+    if (newPhones.every((p) => syncChecked.has(p))) {
+      setSyncChecked(new Set());
+    } else {
+      setSyncChecked(new Set(newPhones));
+    }
+  }
+
+  function toggleOne(phone: string) {
+    setSyncChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(phone)) next.delete(phone);
+      else next.add(phone);
+      return next;
+    });
+  }
+
+  async function handleSyncImport() {
+    setSyncImporting(true);
+    setSyncError('');
+    try {
+      const items: WaSyncImportItem[] = syncPreview
+        .filter((p) => !p.already_exists && syncChecked.has(p.phone))
+        .map((p) => ({
+          phone: p.phone,
+          name: p.name,
+          chat_id: p.chat_id,
+          relationship: syncRels[p.phone] ?? 'friend',
+        }));
+      const result = await importWaContacts(items);
+      setSyncResult(result);
+      listContacts(search, rel).then(setContacts);
+    } catch (err: unknown) {
+      setSyncError(err instanceof Error ? err.message : 'Import failed');
+    } finally {
+      setSyncImporting(false);
+    }
+  }
+
+  const newCount = syncPreview.filter((p) => !p.already_exists).length;
+  const checkedCount = [...syncChecked].filter((phone) =>
+    syncPreview.find((p) => p.phone === phone && !p.already_exists)
+  ).length;
+  const allNewSelected = newCount > 0 && newCount === checkedCount;
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Contacts</h1>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={openSyncDialog} className="gap-2">
+            <Smartphone size={16} />
+            Sync WhatsApp
+          </Button>
           <Button variant="outline" onClick={() => nav('/contacts/import')} className="gap-2">
             <Upload size={16} />
             Import Calendar
@@ -137,6 +232,130 @@ export default function ContactsPage() {
           onCancel={() => setConfirmDelete(null)}
         />
       )}
+
+      {/* WhatsApp Sync Dialog */}
+      <Dialog open={syncOpen} onOpenChange={(open) => { if (!open) setSyncOpen(false); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Sync WhatsApp Contacts</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto">
+            {syncLoading && (
+              <div className="flex items-center justify-center py-16 text-muted-foreground gap-2">
+                <Loader2 size={20} className="animate-spin" />
+                Loading contacts from WhatsApp…
+              </div>
+            )}
+
+            {syncError && !syncLoading && (
+              <div className="rounded-md bg-destructive/10 text-destructive text-sm p-4">
+                {syncError}
+              </div>
+            )}
+
+            {syncResult && (
+              <div className="rounded-md bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 text-sm p-4">
+                Imported {syncResult.created} contact{syncResult.created !== 1 ? 's' : ''}.
+                {syncResult.skipped > 0 && ` ${syncResult.skipped} skipped (already exist).`}
+              </div>
+            )}
+
+            {!syncLoading && !syncError && syncPreview.length > 0 && !syncResult && (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-muted-foreground">
+                    <th className="text-left py-2 pr-3 w-6"></th>
+                    <th className="text-left py-2 pr-3">Name</th>
+                    <th className="text-left py-2 pr-3">Phone</th>
+                    <th className="text-left py-2 pr-3">Relationship</th>
+                    <th className="text-left py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {syncPreview.map((item) => (
+                    <tr key={item.phone} className="border-b last:border-0">
+                      <td className="py-2 pr-3">
+                        <input
+                          type="checkbox"
+                          checked={!item.already_exists && syncChecked.has(item.phone)}
+                          disabled={item.already_exists}
+                          onChange={() => toggleOne(item.phone)}
+                          className="h-4 w-4 accent-primary"
+                        />
+                      </td>
+                      <td className="py-2 pr-3 font-medium">{item.name}</td>
+                      <td className="py-2 pr-3 text-muted-foreground">{item.phone}</td>
+                      <td className="py-2 pr-3">
+                        {item.already_exists ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : (
+                          <Select
+                            value={syncRels[item.phone] ?? 'friend'}
+                            onValueChange={(v) =>
+                              setSyncRels((prev) => ({ ...prev, [item.phone]: v as RelationshipType }))
+                            }
+                          >
+                            <SelectTrigger className="h-7 w-32 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {RELATIONSHIPS.map((r) => (
+                                <SelectItem key={r} value={r} className="text-xs">
+                                  {r}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </td>
+                      <td className="py-2">
+                        {item.already_exists ? (
+                          <Badge className="text-xs bg-muted text-muted-foreground border-0">
+                            Already imported
+                          </Badge>
+                        ) : (
+                          <Badge className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0">
+                            New
+                          </Badge>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {!syncLoading && !syncError && syncPreview.length === 0 && !syncResult && (
+              <p className="text-center text-muted-foreground py-12 text-sm">
+                No WhatsApp contacts found.
+              </p>
+            )}
+          </div>
+
+          <DialogFooter className="flex items-center gap-3 pt-4 border-t mt-0">
+            {!syncResult && newCount > 0 && (
+              <Button variant="ghost" size="sm" onClick={toggleAll} className="mr-auto text-xs">
+                {allNewSelected ? 'Deselect All' : 'Select All New'}
+              </Button>
+            )}
+            {syncResult ? (
+              <Button onClick={() => setSyncOpen(false)}>Close</Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setSyncOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={handleSyncImport}
+                  disabled={syncImporting || syncLoading || checkedCount === 0}
+                >
+                  {syncImporting && <Loader2 size={14} className="animate-spin mr-1" />}
+                  Import {checkedCount > 0 ? checkedCount : ''} contact{checkedCount !== 1 ? 's' : ''}
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

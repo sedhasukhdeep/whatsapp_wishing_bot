@@ -21,6 +21,20 @@ async def send_whatsapp_message(chat_id: str, message: str) -> dict:
         raise HTTPException(status_code=502, detail=f"WhatsApp bridge error: {e}") from e
 
 
+async def get_wa_contacts() -> list[dict]:
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(f"{settings.wa_bridge_url}/wa-contacts")
+            if resp.status_code == 503:
+                raise HTTPException(status_code=503, detail="WhatsApp not connected — scan QR code first")
+            resp.raise_for_status()
+            return resp.json()
+    except HTTPException:
+        raise
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"WhatsApp bridge error: {e}") from e
+
+
 async def send_whatsapp_gif(chat_id: str, gif_url: str, caption: str = "") -> dict:
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
