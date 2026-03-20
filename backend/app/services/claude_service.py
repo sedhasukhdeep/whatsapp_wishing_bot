@@ -155,7 +155,7 @@ async def _generate_gemini(prompt: str, api_key: str, model: str) -> str:
 
 
 async def _generate_local(prompt: str, model: str, local_ai_url: str) -> str:
-    client = AsyncOpenAI(base_url=local_ai_url, api_key="not-needed")
+    client = AsyncOpenAI(base_url=local_ai_url, api_key="not-needed", timeout=120.0)
     response = await client.chat.completions.create(
         model=model,
         max_tokens=800,
@@ -295,7 +295,7 @@ async def call_ai_raw(system_prompt: str, user_message: str, db=None, max_tokens
         return response.text.strip()
 
     async def _local(model: str) -> str:
-        client = AsyncOpenAI(base_url=ai["local_ai_url"], api_key="not-needed")
+        client = AsyncOpenAI(base_url=ai["local_ai_url"], api_key="not-needed", timeout=120.0)
         response = await client.chat.completions.create(
             model=model,
             max_tokens=max_tokens,
