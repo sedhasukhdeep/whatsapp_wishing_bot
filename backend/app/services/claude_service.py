@@ -82,8 +82,11 @@ def _build_prompt(
 
     length_hint = LENGTH_GUIDE.get(length, "~60 words")
 
+    # Use alias in the AI prompt if configured
+    display_name = contact.alias if (contact.alias and contact.use_alias) else contact.name
+
     parts = [
-        f"Write a {tone} {occasion_display} WhatsApp message for {contact.name} ({contact.relationship}).",
+        f"Write a {tone} {occasion_display} WhatsApp message for {display_name} ({contact.relationship}).",
         f"Language: {language}. Length: {length_hint}.",
     ]
     if contact.notes:

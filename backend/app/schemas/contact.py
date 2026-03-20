@@ -17,6 +17,8 @@ class ContactBase(BaseModel):
     relationship_label: str | None = None
     alias: str | None = None
     use_alias_in_broadcast: bool = False
+    use_alias: bool = False
+    auto_send: bool = False
     notes: str | None = None
     tone_preference: ToneType = "warm"
     language: str = "en"

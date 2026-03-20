@@ -76,8 +76,6 @@ export default function OnboardingWizard({ onDismiss }: Props) {
     return () => clearInterval(timer);
   }, [step]);
 
-  const isLast = step === STEPS.length - 1;
-
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-card text-card-foreground rounded-xl p-8 w-[500px] max-w-[95%] shadow-2xl border relative">

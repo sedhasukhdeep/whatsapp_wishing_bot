@@ -2,7 +2,7 @@ export type RelationshipType = 'family' | 'friend' | 'colleague' | 'acquaintance
 export type ToneType = 'warm' | 'funny' | 'formal';
 export type LengthType = 'short' | 'medium' | 'long';
 export type OccasionType = 'birthday' | 'anniversary' | 'custom';
-export type DraftStatus = 'pending' | 'approved' | 'sent' | 'skipped';
+export type DraftStatus = 'pending' | 'approved' | 'sent' | 'skipped' | 'scheduled';
 export type TargetType = 'group' | 'individual';
 export type BroadcastStatus = 'draft' | 'sent';
 
@@ -14,6 +14,8 @@ export interface Contact {
   relationship_label: string | null;
   alias: string | null;
   use_alias_in_broadcast: boolean;
+  use_alias: boolean;
+  auto_send: boolean;
   notes: string | null;
   tone_preference: ToneType;
   language: string;
@@ -64,6 +66,7 @@ export interface MessageDraft {
   edited_text: string | null;
   final_text: string | null;
   gif_url: string | null;
+  scheduled_for: string | null;
   status: DraftStatus;
   sent_at: string | null;
   created_at: string;

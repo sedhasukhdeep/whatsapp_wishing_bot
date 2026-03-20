@@ -6,6 +6,7 @@ const VARIANT_MAP: Record<DraftStatus, 'default' | 'secondary' | 'destructive' |
   approved: 'default',
   sent: 'secondary',
   skipped: 'outline',
+  scheduled: 'outline',
 };
 
 const LABELS: Record<DraftStatus, string> = {
@@ -13,6 +14,7 @@ const LABELS: Record<DraftStatus, string> = {
   approved: 'Approved',
   sent: 'Sent',
   skipped: 'Skipped',
+  scheduled: 'Scheduled',
 };
 
 const COLOR_CLASS: Record<DraftStatus, string> = {
@@ -20,6 +22,7 @@ const COLOR_CLASS: Record<DraftStatus, string> = {
   approved: 'bg-blue-600 text-white border-blue-600',
   sent: 'bg-emerald-600 text-white border-emerald-600',
   skipped: 'border-muted-foreground text-muted-foreground',
+  scheduled: 'border-purple-500 text-purple-600 dark:text-purple-400',
 };
 
 export default function StatusBadge({ status }: { status: DraftStatus }) {

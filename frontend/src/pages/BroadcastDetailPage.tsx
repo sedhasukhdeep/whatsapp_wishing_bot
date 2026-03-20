@@ -6,6 +6,7 @@ import {
   getBroadcast,
   listContacts,
   removeBroadcastRecipient,
+  retryBroadcast,
   sendBroadcast,
 } from '../api/client';
 import type { BroadcastWithRecipients, Contact } from '../types';
@@ -28,7 +29,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { ArrowLeft, CheckCircle2, Loader2, Send, Sparkles, UserPlus, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Loader2, RefreshCw, Send, Sparkles, UserPlus, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function BroadcastDetailPage() {
@@ -43,6 +44,7 @@ export default function BroadcastDetailPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedContactIds, setSelectedContactIds] = useState<Set<number>>(new Set());
   const [addingRecipients, setAddingRecipients] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
@@ -119,11 +121,25 @@ export default function BroadcastDetailPage() {
     await load();
   }
 
+  async function handleRetry() {
+    setRetrying(true);
+    setError('');
+    try {
+      await retryBroadcast(Number(id));
+      await load();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to retry');
+    } finally {
+      setRetrying(false);
+    }
+  }
+
   if (loading || !broadcast) return <div className="p-8 text-muted-foreground">Loading...</div>;
 
   const isSent = broadcast.status === 'sent';
   const sentCount = broadcast.recipients.filter((r) => r.sent_at).length;
   const totalCount = broadcast.recipients.length;
+  const failedCount = broadcast.recipients.filter((r) => r.error).length;
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
@@ -259,18 +275,33 @@ export default function BroadcastDetailPage() {
 
       {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
 
-      {/* Send button */}
-      {!isSent && (
-        <Button
-          size="lg"
-          className="gap-2"
-          disabled={sending || !messageText.trim() || broadcast.recipients.length === 0}
-          onClick={handleSend}
-        >
-          <Send size={16} />
-          {sending ? 'Sending...' : `Send to All (${totalCount})`}
-        </Button>
-      )}
+      {/* Send / Retry buttons */}
+      <div className="flex gap-3 flex-wrap">
+        {!isSent && (
+          <Button
+            size="lg"
+            className="gap-2"
+            disabled={sending || !messageText.trim() || broadcast.recipients.length === 0}
+            onClick={handleSend}
+          >
+            <Send size={16} />
+            {sending ? 'Sending...' : `Send to All (${totalCount})`}
+          </Button>
+        )}
+
+        {isSent && failedCount > 0 && (
+          <Button
+            size="lg"
+            variant="outline"
+            className="gap-2"
+            disabled={retrying}
+            onClick={handleRetry}
+          >
+            <RefreshCw size={16} className={retrying ? 'animate-spin' : ''} />
+            {retrying ? 'Retrying...' : `Retry Failed (${failedCount})`}
+          </Button>
+        )}
+      </div>
 
       {/* Recipient picker dialog */}
       <Dialog open={showRecipientPicker} onOpenChange={setShowRecipientPicker}>

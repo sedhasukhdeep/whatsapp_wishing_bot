@@ -139,6 +139,70 @@ def remove_recipient(broadcast_id: int, recipient_id: int, db: Session = Depends
     db.commit()
 
 
+async def _do_retry(broadcast_id: int, message_text: str, recipient_ids: list[int]) -> None:
+    """Background task: retry sending for specific failed recipients."""
+    from app.database import SessionLocal
+    db = SessionLocal()
+    try:
+        recipients = (
+            db.query(BroadcastRecipient)
+            .options(
+                joinedload(BroadcastRecipient.contact),
+                joinedload(BroadcastRecipient.target),
+            )
+            .filter(BroadcastRecipient.id.in_(recipient_ids))
+            .all()
+        )
+        for r in recipients:
+            try:
+                if r.recipient_type == "contact" and r.contact and r.contact.whatsapp_chat_id:
+                    if r.contact.use_alias_in_broadcast and r.contact.alias:
+                        name = r.contact.alias
+                    else:
+                        name = (r.contact.name or "").split()[0]
+                    personalized = message_text.replace("{name}", name)
+                    await send_whatsapp_message(r.contact.whatsapp_chat_id, personalized)
+                elif r.recipient_type == "target" and r.target:
+                    await send_whatsapp_message(r.target.chat_id, message_text)
+                else:
+                    r.error = "No WhatsApp chat linked"
+                    db.commit()
+                    continue
+                r.sent_at = datetime.now(timezone.utc)
+                r.error = None
+                db.commit()
+            except Exception as e:
+                r.error = str(e)[:500]
+                db.commit()
+    finally:
+        db.close()
+
+
+@router.post("/{broadcast_id}/retry", status_code=202)
+async def retry_failed(broadcast_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    b = _load_broadcast(db, broadcast_id)
+    if b.status != "sent":
+        raise HTTPException(status_code=400, detail="Broadcast must be in sent state to retry")
+
+    failed = (
+        db.query(BroadcastRecipient)
+        .filter(
+            BroadcastRecipient.broadcast_id == broadcast_id,
+            BroadcastRecipient.error.isnot(None),
+        )
+        .all()
+    )
+    if not failed:
+        raise HTTPException(status_code=400, detail="No failed recipients to retry")
+
+    for r in failed:
+        r.error = None
+    db.commit()
+
+    background_tasks.add_task(_do_retry, broadcast_id, b.message_text, [r.id for r in failed])
+    return {"status": "retrying", "count": len(failed)}
+
+
 async def _do_send(broadcast_id: int, message_text: str) -> None:
     """Background task: send to all recipients and update status."""
     from app.database import SessionLocal  # local import to avoid circular

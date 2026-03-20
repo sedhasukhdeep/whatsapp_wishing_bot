@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { approveDraft, regenerateDraft, sendDraft, skipDraft } from '../../api/client';
+import { approveDraft, regenerateDraft, scheduleDraft, sendDraft, skipDraft } from '../../api/client';
 import type { DashboardOccasionItem, MessageDraft, WhatsAppTarget } from '../../types';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import StatusBadge from '../shared/StatusBadge';
@@ -7,6 +7,7 @@ import MessageEditor from './MessageEditor';
 import GifPicker from './GifPicker';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -14,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Cake, Heart, ImagePlus, Star, X } from 'lucide-react';
+import { CalendarClock, Cake, Heart, ImagePlus, Star, X } from 'lucide-react';
 
 interface Props {
   item: DashboardOccasionItem;
@@ -48,6 +49,14 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
   const [gifPreview, setGifPreview] = useState<string | null>(null);
   const [showGifPicker, setShowGifPicker] = useState(false);
 
+  // Feedback for regeneration
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
+
+  // Schedule picker
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [scheduleFor, setScheduleFor] = useState('');
+
   useEffect(() => {
     setText(draft?.edited_text ?? draft?.generated_text ?? '');
     setGifUrl(draft?.gif_url ?? null);
@@ -80,9 +89,12 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
 
   function doRegen() {
     setLoading('regen');
+    const feedback = feedbackText.trim() || undefined;
     handle(async () => {
-      const d = await regenerateDraft(currentDraft!.id);
+      const d = await regenerateDraft(currentDraft!.id, feedback);
       setText(d.generated_text);
+      setFeedbackText('');
+      setShowFeedback(false);
       return d;
     });
   }
@@ -92,6 +104,37 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
     const targetId = canSendDirectly ? null : parseInt(selectedTarget, 10);
     handle(() => sendDraft(currentDraft!.id, targetId, gifUrl), 'Message sent!');
   }
+
+  function handleApprove() {
+    setLoading('approve');
+    setError('');
+    setSuccess('');
+    const editedText = text !== currentDraft!.generated_text ? text : undefined;
+    approveDraft(currentDraft!.id, editedText)
+      .then((updated) => {
+        onUpdate(updated);
+        setSuccess(updated.status === 'sent' ? 'Approved & sent!' : 'Approved!');
+        setTimeout(() => setSuccess(''), 3000);
+      })
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : 'An error occurred');
+      })
+      .finally(() => setLoading(null));
+  }
+
+  function handleSchedule() {
+    if (!scheduleFor) return;
+    setLoading('schedule');
+    handle(async () => {
+      const d = await scheduleDraft(currentDraft!.id, new Date(scheduleFor).toISOString());
+      setShowSchedule(false);
+      return d;
+    }, 'Scheduled!');
+  }
+
+  const approveLabel = contact.auto_send
+    ? (loading === 'approve' ? '...' : 'Approve & Send')
+    : (loading === 'approve' ? '...' : 'Approve');
 
   return (
     <Card className="mb-4">
@@ -124,6 +167,34 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
               regenerating={loading === 'regen'}
             />
 
+            {/* Feedback for regeneration */}
+            <div className="mb-3">
+              <button
+                type="button"
+                className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                onClick={() => setShowFeedback((v) => !v)}
+              >
+                {showFeedback ? 'Hide feedback' : 'Add feedback for regeneration'}
+              </button>
+              {showFeedback && (
+                <Textarea
+                  value={feedbackText}
+                  onChange={(e) => setFeedbackText(e.target.value)}
+                  placeholder="What to change? e.g. Make it funnier, keep it shorter, add a quote..."
+                  rows={2}
+                  className="mt-1.5 text-sm resize-none"
+                />
+              )}
+            </div>
+
+            {/* Scheduled time indicator */}
+            {currentDraft.status === 'scheduled' && currentDraft.scheduled_for && (
+              <p className="mb-3 text-xs text-purple-600 dark:text-purple-400 flex items-center gap-1">
+                <CalendarClock size={12} />
+                Scheduled for {new Date(currentDraft.scheduled_for).toLocaleString()}
+              </p>
+            )}
+
             {/* GIF preview */}
             {gifPreview && (
               <div className="relative inline-block mb-3">
@@ -138,74 +209,106 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
             )}
 
             {currentDraft.status !== 'sent' && currentDraft.status !== 'skipped' && (
-              <div className="flex flex-wrap gap-2 items-center">
-                <Button
-                  size="sm"
-                  disabled={!!loading}
-                  onClick={() => {
-                    setLoading('approve');
-                    handle(
-                      () => approveDraft(currentDraft.id, text !== currentDraft.generated_text ? text : undefined),
-                      'Approved!'
-                    );
-                  }}
-                >
-                  {loading === 'approve' ? '...' : 'Approve'}
-                </Button>
-
-                {canSendDirectly ? (
+              <>
+                <div className="flex flex-wrap gap-2 items-center">
                   <Button
                     size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                    disabled={currentDraft.status !== 'approved' || !!loading}
-                    onClick={handleSend}
+                    disabled={!!loading}
+                    onClick={handleApprove}
                   >
-                    {loading === 'send' ? 'Sending...' : `Send to ${linkedChatName}`}
+                    {approveLabel}
                   </Button>
-                ) : (
-                  <>
-                    <Select value={selectedTarget} onValueChange={setSelectedTarget}>
-                      <SelectTrigger className="h-8 text-xs w-44">
-                        <SelectValue placeholder="Select target..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {targets.map((t) => (
-                          <SelectItem key={t.id} value={String(t.id)}>
-                            {t.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+
+                  {canSendDirectly ? (
                     <Button
                       size="sm"
                       className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                      disabled={currentDraft.status !== 'approved' || !canSendViaTarget || !!loading}
+                      disabled={currentDraft.status !== 'approved' || !!loading}
                       onClick={handleSend}
                     >
-                      {loading === 'send' ? 'Sending...' : 'Send'}
+                      {loading === 'send' ? 'Sending...' : `Send to ${linkedChatName}`}
                     </Button>
-                  </>
+                  ) : (
+                    <>
+                      <Select value={selectedTarget} onValueChange={setSelectedTarget}>
+                        <SelectTrigger className="h-8 text-xs w-44">
+                          <SelectValue placeholder="Select target..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {targets.map((t) => (
+                            <SelectItem key={t.id} value={String(t.id)}>
+                              {t.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                        disabled={currentDraft.status !== 'approved' || !canSendViaTarget || !!loading}
+                        onClick={handleSend}
+                      >
+                        {loading === 'send' ? 'Sending...' : 'Send'}
+                      </Button>
+                    </>
+                  )}
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!!loading}
+                    onClick={() => { setLoading('skip'); handle(() => skipDraft(currentDraft.id)); }}
+                  >
+                    Skip
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="gap-1 text-muted-foreground"
+                    onClick={() => setShowGifPicker(true)}
+                  >
+                    <ImagePlus size={14} />
+                    {gifUrl ? 'Change GIF' : 'Add GIF'}
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="gap-1 text-muted-foreground"
+                    onClick={() => setShowSchedule((v) => !v)}
+                  >
+                    <CalendarClock size={14} />
+                    {currentDraft.status === 'scheduled' ? 'Reschedule' : 'Schedule'}
+                  </Button>
+                </div>
+
+                {/* Inline schedule picker */}
+                {showSchedule && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      type="datetime-local"
+                      value={scheduleFor}
+                      onChange={(e) => setScheduleFor(e.target.value)}
+                      className="text-sm border rounded px-2 py-1 bg-background text-foreground"
+                    />
+                    <Button
+                      size="sm"
+                      disabled={!scheduleFor || !!loading}
+                      onClick={handleSchedule}
+                    >
+                      {loading === 'schedule' ? '...' : 'Confirm'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowSchedule(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
                 )}
-
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!!loading}
-                  onClick={() => { setLoading('skip'); handle(() => skipDraft(currentDraft.id)); }}
-                >
-                  Skip
-                </Button>
-
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="gap-1 text-muted-foreground"
-                  onClick={() => setShowGifPicker(true)}
-                >
-                  <ImagePlus size={14} />
-                  {gifUrl ? 'Change GIF' : 'Add GIF'}
-                </Button>
-              </div>
+              </>
             )}
           </>
         ) : (

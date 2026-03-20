@@ -23,6 +23,7 @@ class MessageDraft(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
     gif_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     generation_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    scheduled_for: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

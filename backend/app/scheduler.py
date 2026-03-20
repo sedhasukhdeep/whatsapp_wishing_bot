@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import date
+from datetime import date, datetime, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -43,7 +43,7 @@ async def daily_occasion_check(db: Session | None = None) -> int:
                 .first()
             )
             if existing and existing.status != "pending":
-                continue  # keep approved/sent/skipped drafts untouched
+                continue  # keep approved/sent/skipped/scheduled drafts untouched
 
             try:
                 text, prompt = await generate_message(occ.contact, occ, today, db=db)
@@ -82,9 +82,60 @@ async def daily_occasion_check(db: Session | None = None) -> int:
             db.close()
 
 
+async def process_scheduled_drafts(db: Session | None = None) -> int:
+    """Send any drafts that are scheduled and due. Returns count sent."""
+    from app.services.whatsapp_service import send_whatsapp_message
+
+    own_session = db is None
+    if own_session:
+        db = SessionLocal()
+
+    try:
+        now = datetime.now(timezone.utc)
+        drafts = (
+            db.query(MessageDraft)
+            .options(selectinload(MessageDraft.contact))
+            .filter(
+                MessageDraft.status == "scheduled",
+                MessageDraft.scheduled_for <= now,
+            )
+            .all()
+        )
+
+        sent = 0
+        for draft in drafts:
+            contact = draft.contact
+            if not contact or not contact.whatsapp_chat_id:
+                logger.warning("Scheduled draft %d has no WhatsApp chat — skipping", draft.id)
+                continue
+            try:
+                final_text = draft.edited_text or draft.generated_text
+                await send_whatsapp_message(contact.whatsapp_chat_id, final_text)
+                draft.final_text = final_text
+                draft.status = "sent"
+                draft.sent_at = datetime.now(timezone.utc)
+                db.commit()
+                sent += 1
+            except Exception:
+                logger.exception("Failed to send scheduled draft %d", draft.id)
+                db.rollback()
+
+        if sent:
+            logger.info("process_scheduled_drafts: sent %d scheduled drafts", sent)
+        return sent
+    finally:
+        if own_session:
+            db.close()
+
+
 def _run_daily_check():
     """Sync wrapper called by APScheduler."""
     asyncio.run(daily_occasion_check())
+
+
+def _run_scheduled_drafts():
+    """Sync wrapper called by APScheduler."""
+    asyncio.run(process_scheduled_drafts())
 
 
 def start_scheduler():
@@ -98,6 +149,13 @@ def start_scheduler():
         id="daily_check",
         replace_existing=True,
         misfire_grace_time=3600,
+    )
+    scheduler.add_job(
+        func=_run_scheduled_drafts,
+        trigger="interval",
+        minutes=1,
+        id="scheduled_drafts",
+        replace_existing=True,
     )
     scheduler.start()
     logger.info(

@@ -110,8 +110,11 @@ export const approveDraft = (id: number, edited_text?: string) =>
 export const skipDraft = (id: number) =>
   api.patch<MessageDraft>(`/api/drafts/${id}/skip`).then((r) => r.data);
 
-export const regenerateDraft = (id: number) =>
-  api.post<MessageDraft>(`/api/drafts/${id}/regenerate`, null, { timeout: 300000 }).then((r) => r.data);
+export const regenerateDraft = (id: number, feedback?: string) =>
+  api.post<MessageDraft>(`/api/drafts/${id}/regenerate`, feedback ? { feedback } : null, { timeout: 300000 }).then((r) => r.data);
+
+export const scheduleDraft = (id: number, scheduled_for: string) =>
+  api.patch<MessageDraft>(`/api/drafts/${id}/schedule`, { scheduled_for }).then((r) => r.data);
 
 export const sendDraft = (id: number, target_id: number | null, gif_url?: string | null) =>
   api.post<MessageDraft>(`/api/drafts/${id}/send`, { target_id, gif_url }).then((r) => r.data);
@@ -154,6 +157,9 @@ export const removeBroadcastRecipient = (broadcastId: number, recipientId: numbe
 
 export const sendBroadcast = (id: number) =>
   api.post(`/api/broadcasts/${id}/send`);
+
+export const retryBroadcast = (id: number) =>
+  api.post<{ status: string; count: number }>(`/api/broadcasts/${id}/retry`);
 
 // Admin Settings
 export const getAISettings = () =>

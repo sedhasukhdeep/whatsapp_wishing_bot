@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from app.schemas.contact import ContactOut
 from app.schemas.occasion import OccasionOut
 
-DraftStatus = Literal["pending", "approved", "sent", "skipped"]
+DraftStatus = Literal["pending", "approved", "sent", "skipped", "scheduled"]
 
 
 class MessageDraftOut(BaseModel):
@@ -21,6 +21,7 @@ class MessageDraftOut(BaseModel):
     edited_text: str | None
     final_text: str | None
     gif_url: str | None
+    scheduled_for: datetime | None
     status: DraftStatus
     sent_at: datetime | None
     created_at: datetime
@@ -34,6 +35,14 @@ class DraftApproveRequest(BaseModel):
 class DraftSendRequest(BaseModel):
     target_id: int | None = None  # None = use contact's linked whatsapp_chat_id
     gif_url: str | None = None
+
+
+class RegenerateRequest(BaseModel):
+    feedback: str | None = None
+
+
+class DraftScheduleRequest(BaseModel):
+    scheduled_for: datetime
 
 
 # Dashboard composite response
