@@ -140,7 +140,10 @@ async def _run_scan(chat_ids: list[str], limit_per_chat: int) -> None:
             before = db.query(DetectedOccasion).count()
             for msg in messages:
                 try:
-                    await process_message_for_occasion(chat_id, msg["id"], msg["body"], db)
+                    await process_message_for_occasion(
+                        chat_id, msg["id"], msg["body"], db,
+                        timestamp=msg.get("timestamp"),
+                    )
                 except Exception:
                     logger.exception("Detection error on message %s", msg.get("id"))
             after = db.query(DetectedOccasion).count()

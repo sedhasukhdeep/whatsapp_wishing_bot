@@ -114,7 +114,7 @@ async def wa_webhook(body: WAWebhookPayload, db: Session = Depends(get_db)):
 
     # Run occasion detection on ALL incoming messages (non-blocking, silent fail)
     try:
-        await process_message_for_occasion(body.chat_id, body.message_id, body.body, db)
+        await process_message_for_occasion(body.chat_id, body.message_id, body.body, db, timestamp=body.timestamp)
     except Exception:
         logger.exception("Occasion detection failed for message %s", body.message_id)
 

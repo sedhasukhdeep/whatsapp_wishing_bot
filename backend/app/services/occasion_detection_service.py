@@ -1,7 +1,7 @@
 """
 Scans incoming WhatsApp messages for occasion mentions (birthdays, anniversaries, etc.),
-fuzzy-matches detected names against existing contacts, and creates DetectedOccasion
-records for user review.
+uses AI to detect the occasion AND match the recipient against known contacts,
+and creates DetectedOccasion records for user review.
 
 Uses the app-wide AI provider (configured in Settings) via call_ai_raw.
 """
@@ -9,8 +9,7 @@ Uses the app-wide AI provider (configured in Settings) via call_ai_raw.
 import json
 import logging
 import re
-from difflib import SequenceMatcher
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date as date_type
 
 logger = logging.getLogger(__name__)
 
@@ -21,22 +20,32 @@ _OCCASION_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-DETECTION_SYSTEM_PROMPT = (
-    "You analyze WhatsApp messages to detect explicit occasion wishes. "
-    "Return raw JSON only — no markdown, no explanation, no preamble.\n\n"
-    'If the message is wishing someone a special occasion, return:\n'
-    '{"detected":true,"name":"<person name>","occasion_type":"birthday|anniversary|custom",'
-    '"occasion_label":null,"month":<int or null>,"day":<int or null>,"year":<int or null>,'
-    '"confidence":"high|medium|low"}\n\n'
-    'Otherwise return: {"detected":false}\n\n'
-    "Rules:\n"
-    "- Only detect EXPLICIT wishes (e.g. 'Happy birthday John!', 'Wishing you a happy anniversary').\n"
-    "- Do NOT detect vague references like 'it's someone's birthday today'.\n"
-    "- Extract the date only if clearly stated (e.g. 'March 15', 'on the 20th').\n"
-    "- If the name is unclear or missing, set name to empty string and confidence to 'low'."
-)
+DETECTION_SYSTEM_PROMPT = """You analyze WhatsApp messages to detect PERSONAL occasion wishes directed at a specific individual.
 
-# Strip <think>/<thinking> blocks that local reasoning models sometimes emit before JSON
+REJECT (return {"detected":false}) for:
+- Generic public holiday messages NOT directed at a named/specific person:
+  New Year, Christmas, Diwali, Holi, Eid, Navratri, Pongal, Baisakhi, Onam,
+  Thanksgiving, Easter, Halloween, Valentine's Day (generic), Independence Day,
+  Republic Day, or any festival/national holiday
+- Messages wishing "everyone", "all", "the whole group", "the team", etc.
+- Forwarded generic holiday greetings
+- Vague references with no clear recipient (e.g. "someone has a birthday")
+
+DETECT (return full JSON) only for explicit PERSONAL wishes like:
+- "Happy birthday John!" → person: John
+- "Happy anniversary Sarah and Mike!" → person: Sarah/Mike
+- "Wishing you a happy birthday bro!" → detect, name unclear but specific person implied
+- "Many happy returns of the day Priya!" → person: Priya
+
+Given the contacts list below, identify which contact the message is wishing.
+Match on: full name, first name, nickname, alias, relationship terms (bro/sis/didi/bhai/yaar/dude/buddy).
+
+Return raw JSON only — no markdown, no explanation:
+{"detected":true,"name":"<extracted name/nickname>","occasion_type":"birthday|anniversary|custom","occasion_label":null,"month":<int or null>,"day":<int or null>,"year":<int or null>,"confidence":"high|medium|low","matched_contact_id":<contact id int or null>}
+
+or: {"detected":false}"""
+
+# Strip <think>/<thinking> blocks that local reasoning models emit before JSON
 _THINKING_TAG_RE = re.compile(r"<think(?:ing)?>.*?</think(?:ing)?>\s*", re.DOTALL | re.IGNORECASE)
 
 
@@ -48,25 +57,44 @@ def is_likely_occasion_message(text: str) -> bool:
 def _parse_detection_response(raw: str) -> dict | None:
     """Strip thinking tags and parse JSON from the AI response."""
     cleaned = _THINKING_TAG_RE.sub("", raw).strip()
-    # Some models wrap JSON in ```json ... ``` fences
     if cleaned.startswith("```"):
         cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.DOTALL).strip()
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
-        logger.warning("Occasion detection: failed to parse AI response as JSON: %r", cleaned[:200])
+        logger.warning("Occasion detection: failed to parse AI response: %r", cleaned[:200])
         return None
 
 
-async def detect_occasion_from_message(text: str, db) -> dict | None:
+def _build_contacts_context(contacts: list) -> str:
+    """Format contacts list for the AI prompt."""
+    if not contacts:
+        return "No contacts available."
+    lines = ["Contacts:"]
+    for c in contacts:
+        parts = [f"- ID {c.id}: {c.name} ({c.relationship})"]
+        if c.alias:
+            parts.append(f"alias: {c.alias}")
+        if c.notes:
+            # Include a short snippet of notes to help with context
+            parts.append(f"notes: {c.notes[:80]}")
+        lines.append(" | ".join(parts))
+    return "\n".join(lines)
+
+
+async def detect_occasion_from_message(text: str, contacts: list, db) -> dict | None:
     """
     Run AI detection on a message using the app-wide configured AI provider.
+    Passes the contact list so the AI can intelligently match the recipient.
     Returns a detection dict or None if no occasion detected / AI unavailable.
     """
     from app.services.claude_service import call_ai_raw
 
+    contacts_context = _build_contacts_context(contacts)
+    user_message = f"{contacts_context}\n\nMessage: {text}"
+
     try:
-        raw = await call_ai_raw(DETECTION_SYSTEM_PROMPT, text, db=db, max_tokens=200)
+        raw = await call_ai_raw(DETECTION_SYSTEM_PROMPT, user_message, db=db, max_tokens=250)
     except Exception as e:
         logger.warning("Occasion detection: AI call failed (%s) — skipping", e)
         return None
@@ -77,33 +105,16 @@ async def detect_occasion_from_message(text: str, db) -> dict | None:
     return result
 
 
-def fuzzy_match_contact(name: str, db) -> tuple:
-    """
-    Fuzzy-match a detected name against all contacts (name + alias).
-    Returns (contact, score) if best score >= 60, else (None, 0).
-    """
-    from app.models.contact import Contact
-
-    if not name:
-        return None, 0
-
-    name_lower = name.lower()
-    contacts = db.query(Contact).all()
-    best_contact = None
-    best_score = 0
-
-    for c in contacts:
-        score = int(SequenceMatcher(None, name_lower, c.name.lower()).ratio() * 100)
-        if c.alias:
-            alias_score = int(SequenceMatcher(None, name_lower, c.alias.lower()).ratio() * 100)
-            score = max(score, alias_score)
-        if score > best_score:
-            best_score = score
-            best_contact = c
-
-    if best_score >= 60:
-        return best_contact, best_score
-    return None, 0
+def _validate_contact_id(contact_id, contacts: list) -> int | None:
+    """Ensure the AI-returned contact_id actually exists in our contact list."""
+    if contact_id is None:
+        return None
+    valid_ids = {c.id for c in contacts}
+    try:
+        cid = int(contact_id)
+        return cid if cid in valid_ids else None
+    except (TypeError, ValueError):
+        return None
 
 
 def is_duplicate_detection(
@@ -144,11 +155,15 @@ def is_duplicate_detection(
     return False
 
 
-async def process_message_for_occasion(chat_id: str, message_id: str, body: str, db) -> None:
+async def process_message_for_occasion(
+    chat_id: str, message_id: str, body: str, db, timestamp: int | None = None
+) -> None:
     """
-    Full detection pipeline: pre-filter → dedupe → AI detect → fuzzy match → persist.
+    Full detection pipeline: pre-filter → dedupe → load contacts → AI detect+match → persist.
+    timestamp: Unix epoch seconds from the message (used to infer occasion date when AI can't extract one).
     Designed to be called from the webhook; all failures are caught and logged.
     """
+    from app.models.contact import Contact
     from app.models.detected_occasion import DetectedOccasion
 
     if not is_likely_occasion_message(body):
@@ -158,7 +173,10 @@ async def process_message_for_occasion(chat_id: str, message_id: str, body: str,
     if db.query(DetectedOccasion).filter(DetectedOccasion.message_id == message_id).first():
         return
 
-    result = await detect_occasion_from_message(body, db)
+    # Load contacts so the AI can match against them
+    contacts = db.query(Contact).all()
+
+    result = await detect_occasion_from_message(body, contacts, db)
     if not result:
         return
 
@@ -170,8 +188,16 @@ async def process_message_for_occasion(chat_id: str, message_id: str, body: str,
     detected_year = result.get("year")
     confidence = result.get("confidence", "medium")
 
-    matched_contact, match_score = fuzzy_match_contact(detected_name, db)
-    matched_contact_id = matched_contact.id if matched_contact else None
+    # If AI couldn't extract a date, fall back to the message send date
+    if (detected_month is None or detected_day is None) and timestamp:
+        msg_date = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        detected_month = detected_month or msg_date.month
+        detected_day = detected_day or msg_date.day
+        # Don't set year from timestamp — it's the occasion year (birth year), not current year
+
+    # Use AI-suggested contact id (validated against actual contacts)
+    matched_contact_id = _validate_contact_id(result.get("matched_contact_id"), contacts)
+    matched_contact = next((c for c in contacts if c.id == matched_contact_id), None)
 
     if is_duplicate_detection(message_id, matched_contact_id, occasion_type, detected_month, detected_day, db):
         return
@@ -188,7 +214,7 @@ async def process_message_for_occasion(chat_id: str, message_id: str, body: str,
         detected_year=detected_year,
         confidence=confidence,
         matched_contact_id=matched_contact_id,
-        match_score=match_score if match_score else None,
+        match_score=None,  # AI-driven matching — no numeric score
         status="pending",
     )
     db.add(detection)

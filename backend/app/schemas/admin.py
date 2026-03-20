@@ -54,3 +54,4 @@ class WAWebhookPayload(BaseModel):
     chat_id: str
     body: str
     message_id: str
+    timestamp: int | None = None  # Unix timestamp from the bridge

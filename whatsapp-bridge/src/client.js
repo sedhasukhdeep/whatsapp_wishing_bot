@@ -73,7 +73,7 @@ async function forwardToWebhook(msg) {
     await fetch(`${BACKEND_URL}/api/admin/wa-webhook`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, body: msg.body, message_id: msg.id._serialized }),
+      body: JSON.stringify({ chat_id: chatId, body: msg.body, message_id: msg.id._serialized, timestamp: msg.timestamp }),
     });
   } catch (err) {
     console.warn('[WA] Webhook forward error:', err.message);
