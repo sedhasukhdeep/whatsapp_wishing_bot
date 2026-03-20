@@ -281,6 +281,17 @@ export interface DetectionConfirmRequest {
   label: string | null;
 }
 
+export interface OccasionKeyword {
+  keyword: string;
+  occasion_type: OccasionType;
+  label: string | null;
+}
+
+export interface DetectionKeywords {
+  ignore_keywords: string[];
+  occasion_keywords: OccasionKeyword[];
+}
+
 // WhatsApp Contact Sync
 export interface WaSyncPreviewItem {
   phone: string;

@@ -6,6 +6,7 @@ import type {
   Broadcast,
   DetectedOccasion,
   DetectionConfirmRequest,
+  DetectionKeywords,
   GiphyResult,
   BroadcastWithRecipients,
   BridgeStatus,
@@ -211,3 +212,9 @@ export const startScanHistory = (chat_ids?: string[], limit_per_chat = 200) =>
     chat_ids: chat_ids ?? null,
     limit_per_chat,
   }).then((r) => r.data);
+
+export const getDetectionKeywords = () =>
+  api.get<DetectionKeywords>('/api/detections/keywords').then((r) => r.data);
+
+export const updateDetectionKeywords = (data: DetectionKeywords) =>
+  api.put<DetectionKeywords>('/api/detections/keywords', data).then((r) => r.data);

@@ -39,3 +39,19 @@ class DetectionConfirmRequest(BaseModel):
     day: int
     year: int | None = None
     label: str | None = None
+
+
+class OccasionKeyword(BaseModel):
+    keyword: str
+    occasion_type: str  # birthday | anniversary | custom
+    label: str | None = None  # only for custom type
+
+
+class DetectionKeywordsOut(BaseModel):
+    ignore_keywords: list[str]
+    occasion_keywords: list[OccasionKeyword]
+
+
+class DetectionKeywordsUpdate(BaseModel):
+    ignore_keywords: list[str]
+    occasion_keywords: list[OccasionKeyword]

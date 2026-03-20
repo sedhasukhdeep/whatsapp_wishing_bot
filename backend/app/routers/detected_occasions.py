@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from typing import Optional
 
@@ -7,10 +8,11 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import SessionLocal, get_db
+from app.models.admin_setting import AdminSetting
 from app.models.detected_occasion import DetectedOccasion
 from app.models.occasion import Occasion
 from app.models.whatsapp_target import WhatsAppTarget
-from app.schemas.detected_occasion import DetectedOccasionOut, DetectionConfirmRequest
+from app.schemas.detected_occasion import DetectedOccasionOut, DetectionConfirmRequest, DetectionKeywordsOut, DetectionKeywordsUpdate, OccasionKeyword
 from app.schemas.occasion import OccasionOut
 
 router = APIRouter(prefix="/api/detections", tags=["detections"])
@@ -18,6 +20,39 @@ logger = logging.getLogger(__name__)
 
 # In-memory scan state (single-user personal bot — no need for persistence)
 _scan_state: dict = {"running": False, "scanned": 0, "detected": 0, "total": 0, "error": None}
+
+
+def _get_setting(db: Session, key: str) -> str | None:
+    row = db.query(AdminSetting).filter(AdminSetting.key == key).first()
+    return row.value if row else None
+
+
+def _upsert_setting(db: Session, key: str, value: str) -> None:
+    row = db.query(AdminSetting).filter(AdminSetting.key == key).first()
+    if row:
+        row.value = value
+    else:
+        db.add(AdminSetting(key=key, value=value))
+
+
+@router.get("/keywords", response_model=DetectionKeywordsOut)
+def get_keywords(db: Session = Depends(get_db)):
+    """Return current detection keyword settings."""
+    ignore_raw = _get_setting(db, "detection_ignore_keywords")
+    occasion_raw = _get_setting(db, "detection_occasion_keywords")
+    return DetectionKeywordsOut(
+        ignore_keywords=json.loads(ignore_raw) if ignore_raw else [],
+        occasion_keywords=[OccasionKeyword(**k) for k in json.loads(occasion_raw)] if occasion_raw else [],
+    )
+
+
+@router.put("/keywords", response_model=DetectionKeywordsOut)
+def update_keywords(body: DetectionKeywordsUpdate, db: Session = Depends(get_db)):
+    """Save detection keyword settings."""
+    _upsert_setting(db, "detection_ignore_keywords", json.dumps([k.strip() for k in body.ignore_keywords if k.strip()]))
+    _upsert_setting(db, "detection_occasion_keywords", json.dumps([k.model_dump() for k in body.occasion_keywords if k.keyword.strip()]))
+    db.commit()
+    return get_keywords(db)
 
 
 @router.get("", response_model=list[DetectedOccasionOut])

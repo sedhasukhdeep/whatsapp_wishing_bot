@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { confirmDetection, dismissDetection, getScanStatus, listContacts, listDetections, startScanHistory } from '../api/client';
-import type { Contact, DetectedOccasion, DetectionConfirmRequest, OccasionType } from '../types';
+import { confirmDetection, dismissDetection, getDetectionKeywords, getScanStatus, listContacts, listDetections, startScanHistory, updateDetectionKeywords } from '../api/client';
+import type { Contact, DetectedOccasion, DetectionConfirmRequest, DetectionKeywords, OccasionKeyword, OccasionType } from '../types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { ChevronDown, ChevronUp, History, Loader2, Radar, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, History, Loader2, Plus, Radar, Settings, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const MONTHS = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -33,9 +33,9 @@ function formatChatId(name: string | null, chatId: string): string {
 
 const CONFIDENCE_RANK: Record<string, number> = { high: 2, medium: 1, low: 0 };
 const CONFIDENCE_STYLES: Record<string, string> = {
-  high: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-  medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  low: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  high: 'bg-emerald-500 text-white',
+  medium: 'bg-amber-500 text-white',
+  low: 'bg-red-500 text-white',
 };
 const OCCASION_LABELS: Record<string, string> = {
   birthday: '🎂 Birthday',
@@ -106,11 +106,20 @@ export default function DetectionsPage() {
   const [scanError, setScanError] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const [keywords, setKeywords] = useState<DetectionKeywords>({ ignore_keywords: [], occasion_keywords: [] });
+  const [showSettings, setShowSettings] = useState(false);
+  const [keywordsSaving, setKeywordsSaving] = useState(false);
+  const [newIgnoreKw, setNewIgnoreKw] = useState('');
+  const [newOccKw, setNewOccKw] = useState('');
+  const [newOccType, setNewOccType] = useState<OccasionType>('birthday');
+  const [newOccLabel, setNewOccLabel] = useState('');
+
   useEffect(() => {
-    Promise.all([listDetections(), listContacts(), getScanStatus()]).then(([d, c, s]) => {
+    Promise.all([listDetections(), listContacts(), getScanStatus(), getDetectionKeywords()]).then(([d, c, s, kw]) => {
       setDetections(d);
       setContacts(c);
       setScanStatus(s);
+      setKeywords(kw);
       if (s.running) startPolling();
       setLoading(false);
     });
@@ -223,6 +232,46 @@ export default function DetectionsPage() {
     }
   }
 
+  async function saveKeywords(updated: DetectionKeywords) {
+    setKeywordsSaving(true);
+    try {
+      const saved = await updateDetectionKeywords(updated);
+      setKeywords(saved);
+    } finally {
+      setKeywordsSaving(false);
+    }
+  }
+
+  function addIgnoreKeyword() {
+    const kw = newIgnoreKw.trim();
+    if (!kw || keywords.ignore_keywords.includes(kw)) return;
+    const updated = { ...keywords, ignore_keywords: [...keywords.ignore_keywords, kw] };
+    setNewIgnoreKw('');
+    saveKeywords(updated);
+  }
+
+  function removeIgnoreKeyword(kw: string) {
+    saveKeywords({ ...keywords, ignore_keywords: keywords.ignore_keywords.filter((k) => k !== kw) });
+  }
+
+  function addOccasionKeyword() {
+    const kw = newOccKw.trim();
+    if (!kw) return;
+    const entry: OccasionKeyword = {
+      keyword: kw,
+      occasion_type: newOccType,
+      label: newOccType === 'custom' ? newOccLabel.trim() || null : null,
+    };
+    const updated = { ...keywords, occasion_keywords: [...keywords.occasion_keywords, entry] };
+    setNewOccKw('');
+    setNewOccLabel('');
+    saveKeywords(updated);
+  }
+
+  function removeOccasionKeyword(idx: number) {
+    saveKeywords({ ...keywords, occasion_keywords: keywords.occasion_keywords.filter((_, i) => i !== idx) });
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground gap-2">
@@ -254,6 +303,14 @@ export default function DetectionsPage() {
           )}
           <Button
             variant="outline"
+            className={cn("gap-2", showSettings && "bg-accent")}
+            onClick={() => setShowSettings((v) => !v)}
+          >
+            <Settings size={16} />
+            Settings
+          </Button>
+          <Button
+            variant="outline"
             className="gap-2"
             onClick={handleScanHistory}
             disabled={scanStatus?.running}
@@ -265,6 +322,99 @@ export default function DetectionsPage() {
           </Button>
         </div>
       </div>
+
+      {/* Detection settings panel */}
+      {showSettings && (
+        <Card className="mb-4">
+          <CardContent className="pt-4 pb-4 space-y-5">
+            {/* Ignore keywords */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="text-sm font-semibold">Ignore keywords</h3>
+                <span className="text-xs text-muted-foreground">Messages containing these are silently skipped</span>
+                {keywordsSaving && <Loader2 size={12} className="animate-spin text-muted-foreground" />}
+              </div>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {keywords.ignore_keywords.map((kw) => (
+                  <Badge key={kw} className="gap-1 bg-slate-500 text-white pr-1">
+                    {kw}
+                    <button onClick={() => removeIgnoreKeyword(kw)} className="hover:opacity-70">
+                      <X size={11} />
+                    </button>
+                  </Badge>
+                ))}
+                {keywords.ignore_keywords.length === 0 && (
+                  <span className="text-xs text-muted-foreground italic">None — default filters apply</span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  className="h-8 text-sm max-w-xs"
+                  placeholder="e.g. happy new year"
+                  value={newIgnoreKw}
+                  onChange={(e) => setNewIgnoreKw(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addIgnoreKeyword()}
+                />
+                <Button size="sm" variant="outline" className="gap-1 h-8" onClick={addIgnoreKeyword}>
+                  <Plus size={13} /> Add
+                </Button>
+              </div>
+            </div>
+
+            {/* Occasion triggers */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="text-sm font-semibold">Occasion triggers</h3>
+                <span className="text-xs text-muted-foreground">Custom keywords mapped to an occasion type</span>
+              </div>
+              {keywords.occasion_keywords.length > 0 && (
+                <div className="flex flex-col gap-1 mb-3">
+                  {keywords.occasion_keywords.map((ok, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-sm">
+                      <Badge className="bg-blue-500 text-white font-mono">{ok.keyword}</Badge>
+                      <span className="text-muted-foreground">→</span>
+                      <Badge className="bg-blue-500 text-white">{OCCASION_LABELS[ok.occasion_type] ?? ok.occasion_type}{ok.label ? `: "${ok.label}"` : ''}</Badge>
+                      <button onClick={() => removeOccasionKeyword(idx)} className="ml-auto text-muted-foreground hover:text-destructive">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {keywords.occasion_keywords.length === 0 && (
+                <p className="text-xs text-muted-foreground italic mb-3">None added yet</p>
+              )}
+              <div className="flex gap-2 items-center flex-wrap">
+                <Input
+                  className="h-8 text-sm w-36"
+                  placeholder="keyword"
+                  value={newOccKw}
+                  onChange={(e) => setNewOccKw(e.target.value)}
+                />
+                <Select value={newOccType} onValueChange={(v) => setNewOccType(v as OccasionType)}>
+                  <SelectTrigger className="h-8 w-36"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="birthday">Birthday</SelectItem>
+                    <SelectItem value="anniversary">Anniversary</SelectItem>
+                    <SelectItem value="custom">Custom</SelectItem>
+                  </SelectContent>
+                </Select>
+                {newOccType === 'custom' && (
+                  <Input
+                    className="h-8 text-sm w-32"
+                    placeholder="label"
+                    value={newOccLabel}
+                    onChange={(e) => setNewOccLabel(e.target.value)}
+                  />
+                )}
+                <Button size="sm" variant="outline" className="gap-1 h-8" onClick={addOccasionKeyword}>
+                  <Plus size={13} /> Add
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Scan progress */}
       {scanStatus?.running && (
@@ -326,14 +476,14 @@ export default function DetectionsPage() {
                       {/* Header: name + badges */}
                       <div className="flex flex-wrap items-center gap-2 mb-2">
                         <span className="font-semibold text-base">{d.detected_name || '(unnamed)'}</span>
-                        <Badge className="border-0 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs">
+                        <Badge className="border-0 bg-blue-500 text-white text-xs">
                           {OCCASION_LABELS[d.occasion_type] ?? d.occasion_type}
                         </Badge>
                         <Badge className={cn('border-0 text-xs', CONFIDENCE_STYLES[d.confidence] ?? CONFIDENCE_STYLES.medium)}>
                           {d.confidence} confidence
                         </Badge>
                         {isMulti && (
-                          <Badge className="border-0 bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 text-xs">
+                          <Badge className="border-0 bg-violet-500 text-white text-xs">
                             {group.members.length} messages
                           </Badge>
                         )}

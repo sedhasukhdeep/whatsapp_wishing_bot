@@ -286,6 +286,23 @@ def is_duplicate_detection(
     return False
 
 
+def _load_detection_settings(db) -> tuple[list[str], list[dict]]:
+    """Load (ignore_keywords, occasion_keywords) from AdminSetting table."""
+    from app.models.admin_setting import AdminSetting
+    import json as _json
+
+    def _get(key: str) -> str | None:
+        row = db.query(AdminSetting).filter(AdminSetting.key == key).first()
+        return row.value if row else None
+
+    ignore_raw = _get("detection_ignore_keywords")
+    occasion_raw = _get("detection_occasion_keywords")
+    return (
+        _json.loads(ignore_raw) if ignore_raw else [],
+        _json.loads(occasion_raw) if occasion_raw else [],
+    )
+
+
 async def process_message_for_occasion(
     chat_id: str, message_id: str, body: str, db, timestamp: int | None = None
 ) -> None:
@@ -293,7 +310,6 @@ async def process_message_for_occasion(
     Full detection pipeline: pre-filter → dedupe → load contacts → resolve/detect → persist.
 
     Step 1 (1:1 chat): If chat_id is @c.us, resolve the contact directly by phone number.
-                       AI is still called to detect occasion type/date, but contact is locked.
     Step 2 (group chat): AI-driven detection + matching against full contact list.
 
     timestamp: Unix epoch seconds from the message (used to infer occasion date when AI can't).
@@ -302,7 +318,24 @@ async def process_message_for_occasion(
     from app.models.contact import Contact
     from app.models.detected_occasion import DetectedOccasion
 
-    if not is_likely_occasion_message(body):
+    body_lower = body.lower()
+
+    # Load custom keyword settings
+    ignore_keywords, occasion_keywords = _load_detection_settings(db)
+
+    # Check ignore keywords — skip entirely if matched
+    if any(kw.lower() in body_lower for kw in ignore_keywords if kw.strip()):
+        return
+
+    # Check custom occasion keyword triggers
+    forced_occasion: dict | None = None
+    for ok in occasion_keywords:
+        if ok.get("keyword", "").lower().strip() in body_lower:
+            forced_occasion = ok
+            break
+
+    # Standard pre-filter — skip if no occasion keywords AND no custom trigger
+    if not is_likely_occasion_message(body) and not forced_occasion:
         return
 
     # Check message_id deduplication before any AI call
@@ -320,22 +353,42 @@ async def process_message_for_occasion(
             logger.debug("1:1 chat: resolved contact %s from JID %s", direct_contact.name, chat_id)
 
     result = await detect_occasion_from_message(body, contacts, db)
-    if not result:
+
+    if not result and not forced_occasion:
         return
 
-    detected_name = result.get("name", "").strip()
-    occasion_type = result.get("occasion_type", "custom")
-    occasion_label = result.get("occasion_label")
-    detected_month = result.get("month")
-    detected_day = result.get("day")
-    detected_year = result.get("year")
-    confidence = result.get("confidence", "medium")
+    if result:
+        detected_name = result.get("name", "").strip()
+        occasion_type = result.get("occasion_type", "custom")
+        occasion_label = result.get("occasion_label")
+        detected_month = result.get("month")
+        detected_day = result.get("day")
+        detected_year = result.get("year")
+        confidence = result.get("confidence", "medium")
+    else:
+        # Forced by custom keyword with no AI extraction
+        detected_name = ""
+        occasion_type = "custom"
+        occasion_label = None
+        detected_month = None
+        detected_day = None
+        detected_year = None
+        confidence = "low"
 
-    # If AI couldn't extract a date, fall back to the message send date
-    if (detected_month is None or detected_day is None) and timestamp:
-        msg_date = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-        detected_month = detected_month or msg_date.month
-        detected_day = detected_day or msg_date.day
+    # Override occasion type/label from custom keyword if set
+    if forced_occasion:
+        occasion_type = forced_occasion.get("occasion_type", occasion_type)
+        if forced_occasion.get("label"):
+            occasion_label = forced_occasion["label"]
+
+    # Date fallback: use message timestamp, or now() as last resort
+    if detected_month is None or detected_day is None:
+        fallback_dt = (
+            datetime.fromtimestamp(timestamp, tz=timezone.utc) if timestamp
+            else datetime.now(timezone.utc)
+        )
+        detected_month = detected_month or fallback_dt.month
+        detected_day = detected_day or fallback_dt.day
 
     # Step 1 override: trust the direct phone resolution over AI guess
     if direct_contact:
@@ -343,7 +396,7 @@ async def process_message_for_occasion(
         matched_contact = direct_contact
     else:
         # Step 2: use AI-suggested contact id (validated against actual contacts)
-        matched_contact_id = _validate_contact_id(result.get("matched_contact_id"), contacts)
+        matched_contact_id = _validate_contact_id(result.get("matched_contact_id") if result else None, contacts)
         matched_contact = next((c for c in contacts if c.id == matched_contact_id), None)
 
     if is_duplicate_detection(message_id, matched_contact_id, occasion_type, detected_month, detected_day, db):
@@ -395,6 +448,9 @@ async def scan_group_chat_for_occasions(
     if not messages:
         return 0
 
+    # Apply ignore keywords
+    ignore_keywords, occasion_keywords = _load_detection_settings(db)
+
     contacts = db.query(Contact).all()
 
     # Group messages by UTC date
@@ -412,6 +468,10 @@ async def scan_group_chat_for_occasions(
         # Pre-filter: any occasion keyword in this day's messages?
         day_text = " ".join(m["body"] for m in day_msgs)
         if not is_likely_occasion_message(day_text):
+            continue
+
+        # Check ignore keywords
+        if any(kw.lower() in day_text.lower() for kw in ignore_keywords if kw.strip()):
             continue
 
         # Use a synthetic ID for the day-window to deduplicate
