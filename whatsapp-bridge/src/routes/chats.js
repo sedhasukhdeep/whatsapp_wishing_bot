@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { client, getStatus } = require('../client');
+const { client, getStatus, handleDetachedFrame } = require('../client');
 
 const router = Router();
 
@@ -16,6 +16,10 @@ router.get('/chats', async (_req, res) => {
       break;
     } catch (err) {
       console.error(`[WA] getChats error (attempt ${attempt}):`, err.message);
+      if (err.message && err.message.includes('detached Frame')) {
+        handleDetachedFrame();
+        return res.status(503).json({ error: 'WhatsApp not connected' });
+      }
       if (attempt === 2) {
         return res.status(500).json({ error: err.message });
       }

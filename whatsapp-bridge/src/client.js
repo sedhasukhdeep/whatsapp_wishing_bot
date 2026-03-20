@@ -115,9 +115,27 @@ function getStatus() {
   return { ready: isReady, qr_image: currentQR, state };
 }
 
+/**
+ * Call when a Puppeteer "detached Frame" error is caught in a route.
+ * Marks the client as not ready and schedules a re-initialisation so the
+ * bridge recovers without a manual restart.
+ */
+function handleDetachedFrame() {
+  if (isReady) {
+    console.warn('[WA] Detached frame detected — marking not ready, re-initialising in 5s');
+    isReady = false;
+    state = 'disconnected';
+    currentQR = null;
+    setTimeout(() => {
+      state = 'starting';
+      client.initialize().catch((err) => console.error('[WA] Re-init error:', err));
+    }, 5000);
+  }
+}
+
 async function sendMessage(chatId, message) {
   if (!isReady) throw new Error('Client not ready');
   return client.sendMessage(chatId, message);
 }
 
-module.exports = { client, getStatus, sendMessage };
+module.exports = { client, getStatus, sendMessage, handleDetachedFrame };
