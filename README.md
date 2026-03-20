@@ -1,151 +1,54 @@
 # Wishing Bot
 
-A personal web app that sends AI-generated birthday, anniversary, and occasion greetings via WhatsApp.
+A personal web app that sends AI-generated birthday, anniversary, and occasion greetings via WhatsApp. A daily scheduler generates draft messages; you review and approve them in a browser dashboard, then send with one click — or act on them directly from WhatsApp using bot commands.
 
 ---
 
 ## Quick Start (no terminal needed)
 
-### Prerequisites
+The only prerequisite is **Docker Desktop**.
 
-Install **[Docker Desktop](https://docs.docker.com/desktop/)** — it's the only requirement.
+| Platform | Download |
+|---|---|
+| Mac | [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/) |
+| Windows | [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/) |
+| Linux | [Docker Desktop for Linux](https://docs.docker.com/desktop/install/linux-install/) |
 
-- [Download for Mac](https://docs.docker.com/desktop/install/mac-install/)
-- [Download for Windows](https://docs.docker.com/desktop/install/windows-install/)
-- [Download for Linux](https://docs.docker.com/desktop/install/linux-install/)
-
-### Step 1 — Download this app
+### 1. Download the app
 
 Click **Code → Download ZIP** on GitHub, then unzip it anywhere you like.
 
-### Step 2 — Run setup
+### 2. Run the setup wizard
 
-| Platform | Double-click this file |
+| Platform | Double-click |
 |---|---|
-| **Mac / Linux** | `setup.command` |
-| **Windows** | `setup.bat` |
+| Mac / Linux | `setup.command` |
+| Windows | `setup.bat` |
 
-The wizard will guide you through: checking Docker, entering an API key, picking a timezone, and starting the app.
+The wizard checks Docker, asks for an AI API key (or lets you use a local model), picks your timezone, builds the containers, and starts the app — all with Next/Skip buttons.
 
-> **macOS note:** If `setup.command` is blocked by Gatekeeper, right-click it and choose **Open**.
+> **macOS:** If `setup.command` is blocked by Gatekeeper, right-click it and choose **Open**.
 
-### Step 3 — Scan your WhatsApp QR code
+### 3. Connect WhatsApp
 
 Once the app opens, go to **WhatsApp** in the sidebar and scan the QR code with your phone. You only need to do this once — the session is saved.
 
-### Day-to-day use
+### Starting and stopping
 
-| Platform | Start app | Stop app |
+| Platform | Start | Stop |
 |---|---|---|
-| **Mac / Linux** | `start.command` | `stop.command` |
-| **Windows** | `start.bat` | `stop.bat` |
+| Mac / Linux | `start.command` | `stop.command` |
+| Windows | `start.bat` | `stop.bat` |
 
---- A daily scheduler generates Claude-powered draft messages; you review and approve them in a browser dashboard, then send with one click — or approve/send directly from WhatsApp using bot commands.
+---
 
 ## How it works
 
-1. Add contacts and their occasions (birthdays, anniversaries, custom)
-2. Every day at 8 AM the scheduler generates draft messages using Claude
+1. Add contacts and their occasions (birthdays, anniversaries, custom dates)
+2. Every day at 8 AM the scheduler generates AI draft messages
 3. Open the dashboard to review, edit, approve, or skip each draft
 4. Send approved messages to individual contacts or WhatsApp groups
-5. Optionally, receive daily summaries on WhatsApp and reply with commands to act on drafts without opening the browser
-
-## Architecture
-
-Three services run together:
-
-| Service | Port | Purpose |
-|---|---|---|
-| `backend/` | 8000 | Python FastAPI — API, scheduler, AI generation |
-| `whatsapp-bridge/` | 3001 | Node.js — WhatsApp Web session, send/receive messages |
-| `frontend/` | 5173 (dev) / 80 (Docker) | React — dashboard UI |
-
----
-
-## Local development setup
-
-### Prerequisites
-
-- Python 3.11+
-- Node.js 18+
-- An [Anthropic API key](https://console.anthropic.com/) (or a local LLM via LM Studio / Ollama)
-
-### 1. Clone the repo
-
-```bash
-git clone https://github.com/sedhasukhdeep/whatsapp_wishing_bot.git
-cd whatsapp_wishing_bot
-```
-
-### 2. Backend
-
-```bash
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env          # then open .env and set ANTHROPIC_API_KEY
-alembic upgrade head          # creates wishing_bot.db
-```
-
-### 3. WhatsApp bridge
-
-```bash
-cd ../whatsapp-bridge
-npm install
-cp .env.example .env          # sets PORT=3001 and BACKEND_URL=http://localhost:8000
-```
-
-### 4. Frontend
-
-```bash
-cd ../frontend
-npm install
-# frontend/.env is auto-created by start.sh — no manual step needed
-```
-
-### Run everything
-
-```bash
-cd ..
-./start.sh        # start all services
-./start.sh stop   # stop all services
-```
-
-This starts all three services, runs migrations, and opens the app at **http://localhost:5173**. Run `./start.sh stop` from any terminal to kill all three services cleanly.
-
-Or run each service manually in separate terminals:
-
-```bash
-# Terminal 1 — backend
-cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --reload-dir app --port 8000
-
-# Terminal 2 — WhatsApp bridge
-cd whatsapp-bridge && npm start
-
-# Terminal 3 — frontend
-cd frontend && npm run dev
-```
-
-### Connect WhatsApp
-
-Go to **WhatsApp** in the sidebar and scan the QR code with your phone. The session is saved locally — you only need to scan once.
-
----
-
-## Docker setup
-
-```bash
-# 1. Create root .env from template
-cp .env.example .env          # fill in ANTHROPIC_API_KEY
-
-# 2. Build and start all containers
-docker-compose up --build
-
-# 3. Run migrations (first time only)
-docker-compose exec backend alembic upgrade head
-```
-
-Open **http://localhost**. See `docker-run.md` for individual `docker run` commands.
+5. Optionally receive a daily WhatsApp summary and reply with bot commands to act on drafts without opening the browser
 
 ---
 
@@ -158,25 +61,20 @@ Open **Settings** in the sidebar to configure:
 | Provider | Description | Key required |
 |---|---|---|
 | **Auto** | Tries local LLM first, falls back to Claude | Anthropic key |
-| **Claude** | Anthropic Claude models (Haiku, Sonnet, Opus) | `ANTHROPIC_API_KEY` |
+| **Claude** | Anthropic Claude (Haiku, Sonnet, Opus) | `ANTHROPIC_API_KEY` |
 | **OpenAI** | GPT-4o, GPT-4.1, o4-mini, etc. | OpenAI API key |
 | **Gemini** | Google Gemini 2.0/2.5 Flash & Pro | Gemini API key |
 | **Local** | LM Studio or Ollama (OpenAI-compatible) | None |
 
-All provider keys and model selections are configurable from the Settings UI — no restart needed. Keys are stored in the database and never sent to the browser.
+All keys and model selections are configurable from the Settings UI — no restart needed. Keys are stored in the database and never sent to the browser.
 
 ### Giphy
 
-Set a [Giphy API key](https://developers.giphy.com/) to enable the GIF picker on draft cards. The key is stored in the database and proxied through the backend — it is never sent to the browser.
+Set a [Giphy API key](https://developers.giphy.com/) to enable the GIF picker on draft cards. The key is stored in the database and proxied through the backend.
 
 ### Admin WhatsApp notifications
 
-Designate a WhatsApp chat (your own number, a group, etc.) to receive:
-
-- A daily summary of today's occasions and generated drafts
-- An upcoming events preview for the next 7 days
-
-After setting the admin chat, you can reply with bot commands to act on drafts directly from WhatsApp.
+Designate a WhatsApp chat (your own number, a group, etc.) to receive a daily summary of today's occasions and an upcoming events preview for the next 7 days.
 
 ---
 
@@ -188,7 +86,7 @@ Reply to the daily summary (or message the bot any time) with:
 |---|---|
 | `list` | Show today's drafts with IDs and status |
 | `approve <id>` | Approve draft #id |
-| `send <id>` | Approve and send draft #id to the contact |
+| `send <id>` | Approve and send draft #id |
 | `skip <id>` | Skip draft #id |
 | `regenerate <id>` | Regenerate draft #id with AI |
 | `upcoming` | Show occasions in the next 7 days |
@@ -198,17 +96,78 @@ Reply to the daily summary (or message the bot any time) with:
 
 ---
 
-## Useful commands
+## Developer setup
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 18+
+- An [Anthropic API key](https://console.anthropic.com/) (or a local LLM via LM Studio / Ollama)
+
+### Clone and run
 
 ```bash
-# Manually trigger today's draft generation (no need to wait for 8 AM)
+git clone https://github.com/sedhasukhdeep/whatsapp_wishing_bot.git
+cd whatsapp_wishing_bot
+```
+
+**Backend**
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env     # set ANTHROPIC_API_KEY
+alembic upgrade head
+```
+
+**WhatsApp bridge**
+```bash
+cd whatsapp-bridge && npm install
+```
+
+**Frontend**
+```bash
+cd frontend && npm install
+```
+
+**Run all three services**
+```bash
+./start.sh        # starts backend, bridge, and frontend; opens http://localhost:5173
+./start.sh stop   # stops all services
+```
+
+Or manually in three terminals:
+```bash
+# Terminal 1
+cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --reload-dir app --port 8000
+
+# Terminal 2
+cd whatsapp-bridge && npm start
+
+# Terminal 3
+cd frontend && npm run dev
+```
+
+### Docker (manual)
+
+```bash
+cp .env.example .env          # fill in ANTHROPIC_API_KEY
+docker compose up --build -d
+docker compose exec -T backend alembic upgrade head
+```
+
+Open **http://localhost**.
+
+### Useful commands
+
+```bash
+# Trigger today's draft generation immediately (no need to wait for 8 AM)
 curl -X POST http://localhost:8000/api/dashboard/generate
 
-# Create a new Alembic migration after model changes
-cd backend && alembic revision --autogenerate -m "description"
-alembic upgrade head
+# Create a new migration after model changes
+cd backend && alembic revision --autogenerate -m "description" && alembic upgrade head
 
-# API docs (Swagger UI)
+# API docs
 open http://localhost:8000/docs
 ```
 
@@ -216,31 +175,31 @@ open http://localhost:8000/docs
 
 ## Environment variables
 
-### `backend/.env`
+### Root `.env` (Docker / wizard)
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | — | Claude API key |
-| `WA_BRIDGE_URL` | `http://localhost:3001` | WhatsApp bridge URL |
-| `FRONTEND_ORIGIN` | `http://localhost:5173` | Allowed CORS origin |
+| `AI_PROVIDER` | `auto` | `auto` / `claude` / `openai` / `gemini` / `local` |
+| `OPENAI_API_KEY` | — | OpenAI API key |
+| `GEMINI_API_KEY` | — | Google Gemini API key |
 | `SCHEDULER_TIMEZONE` | `Australia/Sydney` | Timezone for daily draft generation |
 | `SCHEDULER_HOUR` | `8` | Hour for daily run |
 | `SCHEDULER_MINUTE` | `0` | Minute for daily run |
-| `DB_URL` | `sqlite:///./wishing_bot.db` | SQLAlchemy database URL |
-| `AI_PROVIDER` | `auto` | `auto` / `claude` / `openai` / `gemini` / `local` |
-| `OPENAI_API_KEY` | — | OpenAI API key |
-| `OPENAI_MODEL` | `gpt-4o-mini` | Default OpenAI model |
-| `GEMINI_API_KEY` | — | Google Gemini API key |
-| `GEMINI_MODEL` | `gemini-2.0-flash` | Default Gemini model |
-| `LOCAL_AI_URL` | `http://localhost:1234/v1` | LM Studio / Ollama base URL |
-| `LOCAL_AI_MODEL` | _(auto-detect)_ | Specific local model name |
 
-### `whatsapp-bridge/.env`
+### `backend/.env` (local dev)
+
+Same variables as above, plus:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `PORT` | `3001` | Port the bridge listens on |
-| `BACKEND_URL` | `http://localhost:8000` | Backend URL for incoming message webhook |
+| `WA_BRIDGE_URL` | `http://localhost:3001` | WhatsApp bridge URL |
+| `FRONTEND_ORIGIN` | `http://localhost:5173` | Allowed CORS origin |
+| `DB_URL` | `sqlite:///./wishing_bot.db` | SQLAlchemy database URL |
+| `LOCAL_AI_URL` | `http://localhost:1234/v1` | LM Studio / Ollama base URL |
+| `LOCAL_AI_MODEL` | _(auto-detect)_ | Specific local model name |
+| `OPENAI_MODEL` | `gpt-4o-mini` | Default OpenAI model |
+| `GEMINI_MODEL` | `gemini-2.0-flash` | Default Gemini model |
 
 ### `frontend/.env` (dev only, auto-created by `start.sh`)
 
