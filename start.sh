@@ -10,6 +10,16 @@ log()  { echo -e "${GREEN}[start]${NC} $*"; }
 warn() { echo -e "${YELLOW}[start]${NC} $*"; }
 die()  { echo -e "${RED}[start]${NC} $*"; exit 1; }
 
+# ── stop subcommand ───────────────────────────────────────────────────────────
+if [[ "${1:-}" == "stop" ]]; then
+  log "Stopping all services..."
+  lsof -ti :8000 :3001 :5173 | xargs kill 2>/dev/null || true
+  sleep 1
+  lsof -ti :8000 :3001 :5173 | xargs kill -9 2>/dev/null || true
+  log "All services stopped."
+  exit 0
+fi
+
 # ── cleanup on exit ───────────────────────────────────────────────────────────
 PIDS=()
 cleanup() {
