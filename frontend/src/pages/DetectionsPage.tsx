@@ -23,6 +23,15 @@ import { History, Loader2, Radar, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const MONTHS = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Format a WhatsApp JID into a human-readable label. */
+function formatChatId(name: string | null, chatId: string): string {
+  if (name) return name;
+  if (chatId.endsWith('@g.us')) return 'Group chat';
+  // Individual: strip @c.us suffix and add + prefix
+  const number = chatId.replace('@c.us', '');
+  return `+${number}`;
+}
 const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 const CONFIDENCE_STYLES: Record<string, string> = {
@@ -276,22 +285,22 @@ export default function DetectionsPage() {
                     </p>
 
                     {/* Meta info */}
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                      <span>
-                        Source: <span className="font-medium text-foreground">{d.source_chat_name || d.source_chat_id}</span>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1.5">
+                        Source: <Badge className="border-0 bg-blue-500 text-white text-xs px-2 py-0.5">{formatChatId(d.source_chat_name, d.source_chat_id)}</Badge>
                       </span>
-                      {d.detected_month && d.detected_day && (
+                      {d.detected_month != null && d.detected_day != null && (
                         <span>
                           Date: <span className="font-medium text-foreground">
-                            {MONTHS[d.detected_month]} {d.detected_day}{d.detected_year ? `, ${d.detected_year}` : ''}
+                            {MONTHS[d.detected_month]} {d.detected_day}{d.detected_year != null ? `, ${d.detected_year}` : ''}
                           </span>
                         </span>
                       )}
-                      {d.matched_contact && (
+                      {d.matched_contact != null && (
                         <span>
                           Match: <span className="font-medium text-foreground">
                             {d.matched_contact.name}
-                            {d.match_score != null && ` (${d.match_score}%)`}
+                            {d.match_score != null ? ` (${d.match_score}%)` : ''}
                           </span>
                         </span>
                       )}
@@ -428,7 +437,7 @@ export default function DetectionsPage() {
               {confirmState.detection.source_chat_id.endsWith('@g.us') && (
                 <p className="text-xs text-emerald-600 dark:text-emerald-400">
                   Messages for this occasion will be sent to the group where it was detected
-                  ({confirmState.detection.source_chat_name || confirmState.detection.source_chat_id}).
+                  ({formatChatId(confirmState.detection.source_chat_name, confirmState.detection.source_chat_id)}).
                 </p>
               )}
 
