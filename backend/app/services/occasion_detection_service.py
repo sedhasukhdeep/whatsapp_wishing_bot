@@ -180,7 +180,7 @@ def resolve_contact_by_phone(jid: str, contacts: list):
 def resolve_contact_by_jid(jid: str, contacts: list):
     """
     Resolve any JID to a contact — checks whatsapp_chat_id first, then phone digits.
-    Used to match the "thanked_by_jid" from group context analysis.
+    Handles both @c.us (1:1 chat) and @s.whatsapp.net (group message sender) JIDs.
     """
     if not jid:
         return None
@@ -188,8 +188,9 @@ def resolve_contact_by_jid(jid: str, contacts: list):
     for contact in contacts:
         if contact.whatsapp_chat_id and contact.whatsapp_chat_id == jid:
             return contact
-    # Fallback: phone digit match (for @c.us JIDs)
-    if "@c.us" in jid:
+    # Fallback: phone digit match for both @c.us and @s.whatsapp.net JIDs
+    # Group message authors arrive as @s.whatsapp.net but contacts store @c.us
+    if "@c.us" in jid or "@s.whatsapp.net" in jid:
         return resolve_contact_by_phone(jid, contacts)
     return None
 
@@ -237,7 +238,8 @@ async def analyze_group_context_window(
     if not messages:
         return None
 
-    # Build JID → contact name map for labelling
+    # Build JID → contact name map for labelling.
+    # Group message authors arrive as @s.whatsapp.net, so add both formats.
     jid_to_contact = {}
     for contact in contacts:
         if contact.whatsapp_chat_id:
@@ -246,6 +248,7 @@ async def analyze_group_context_window(
             phone_digits = re.sub(r"\D", "", contact.phone)
             if len(phone_digits) >= 7:
                 jid_to_contact[f"{phone_digits}@c.us"] = contact
+                jid_to_contact[f"{phone_digits}@s.whatsapp.net"] = contact
 
     # Format messages, capped at 6000 chars to stay within token budget
     MAX_MSG_CHARS = 6000
