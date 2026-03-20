@@ -65,15 +65,32 @@ const BACKEND_URL = process.env.BACKEND_URL || '';
 
 async function forwardToWebhook(msg) {
   if (!BACKEND_URL) return;
-  // Use msg.id.remote — the chat the message belongs to — so self-sent
-  // messages (admin messaging their own Saved Messages) are identified
-  // by the same chat_id as messages received from another account.
+  // Use msg.id.remote — the chat the message belongs to.
   const chatId = msg.id.remote;
+
+  // Fetch chat name (fast — uses cached in-memory state)
+  let chatName = null;
+  try {
+    const chat = await msg.getChat();
+    chatName = chat.name || null;
+  } catch (_) {}
+
+  const senderJid = msg.author || null; // non-null only for group messages
+  const senderName = msg._data?.notifyName || null; // WhatsApp push name
+
   try {
     await fetch(`${BACKEND_URL}/api/admin/wa-webhook`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, body: msg.body, message_id: msg.id._serialized, timestamp: msg.timestamp, author: msg.author || null }),
+      body: JSON.stringify({
+        chat_id: chatId,
+        body: msg.body,
+        message_id: msg.id._serialized,
+        timestamp: msg.timestamp,
+        author: senderJid,
+        chat_name: chatName,
+        sender_name: senderName,
+      }),
     });
   } catch (err) {
     console.warn('[WA] Webhook forward error:', err.message);

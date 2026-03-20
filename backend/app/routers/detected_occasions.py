@@ -179,12 +179,12 @@ async def _run_scan(chat_ids: list[str], limit_per_chat: int) -> None:
             break
         db = SessionLocal()
         try:
-            messages = await get_chat_messages(chat_id, limit=limit_per_chat)
+            chat_name, messages = await get_chat_messages(chat_id, limit=limit_per_chat)
             before = db.query(DetectedOccasion).count()
 
             if chat_id.endswith("@g.us"):
                 # Group chat: daily context-window analysis (thank-you pattern)
-                await scan_group_chat_for_occasions(chat_id, messages, db)
+                await scan_group_chat_for_occasions(chat_id, messages, db, chat_name=chat_name)
             else:
                 # 1:1 chat: message-by-message with direct phone resolution
                 for msg in messages:
@@ -192,6 +192,9 @@ async def _run_scan(chat_ids: list[str], limit_per_chat: int) -> None:
                         await process_message_for_occasion(
                             chat_id, msg["id"], msg["body"], db,
                             timestamp=msg.get("timestamp"),
+                            chat_name=chat_name,
+                            sender_jid=msg.get("author"),
+                            sender_name=msg.get("sender_name"),
                         )
                     except Exception:
                         logger.exception("Detection error on message %s", msg.get("id"))

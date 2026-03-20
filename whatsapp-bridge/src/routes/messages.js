@@ -30,10 +30,11 @@ router.get('/messages/:chatId', async (req, res) => {
         body: m.body,
         timestamp: m.timestamp,
         from_me: m.fromMe,
-        author: m.author || null, // sender JID in group chats (null for DMs)
+        author: m.author || null,                    // sender JID in group chats
+        sender_name: m._data?.notifyName || null,    // WhatsApp push name
       }));
 
-    return res.json(result);
+    return res.json({ chat_name: chat.name || null, messages: result });
   } catch (err) {
     console.error(`[WA] fetchMessages error for ${chatId}:`, err);
     return res.status(500).json({ error: err.message });

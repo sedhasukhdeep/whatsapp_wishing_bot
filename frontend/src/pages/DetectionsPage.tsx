@@ -281,7 +281,14 @@ export default function DetectionsPage() {
     );
   }
 
-  const groups = groupDetections(detections);
+  // Filter out detections whose raw_message contains any ignore keyword
+  const ignoredKws = keywords.ignore_keywords.map((k) => k.toLowerCase());
+  const visibleDetections = ignoredKws.length === 0
+    ? detections
+    : detections.filter((d) => !ignoredKws.some((kw) => d.raw_message.toLowerCase().includes(kw)));
+  const hiddenByFilter = detections.length - visibleDetections.length;
+
+  const groups = groupDetections(visibleDetections);
 
   return (
     <div className="p-8">
@@ -450,6 +457,12 @@ export default function DetectionsPage() {
         <div className="mb-4 rounded-md bg-destructive/10 text-destructive text-sm p-3">{scanError}</div>
       )}
 
+      {hiddenByFilter > 0 && (
+        <div className="mb-4 rounded-md bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-sm px-3 py-2">
+          {hiddenByFilter} detection{hiddenByFilter !== 1 ? 's' : ''} hidden by ignore keywords.
+        </div>
+      )}
+
       {groups.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center py-16 text-center">
@@ -497,8 +510,13 @@ export default function DetectionsPage() {
                       {/* Meta */}
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1.5">
-                          Source: <Badge className="border-0 bg-blue-500 text-white text-xs px-2 py-0.5">{formatChatId(d.source_chat_name, d.source_chat_id)}</Badge>
+                          Group: <Badge className="border-0 bg-blue-500 text-white text-xs px-2 py-0.5">{formatChatId(d.source_chat_name, d.source_chat_id)}</Badge>
                         </span>
+                        {d.sender_name && (
+                          <span className="flex items-center gap-1.5">
+                            Sender: <span className="font-medium text-foreground">{d.sender_name}</span>
+                          </span>
+                        )}
                         {d.detected_month != null && d.detected_day != null && (
                           <span>
                             Date: <span className="font-medium text-foreground">

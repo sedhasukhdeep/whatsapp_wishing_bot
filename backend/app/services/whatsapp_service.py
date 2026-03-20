@@ -50,8 +50,11 @@ async def get_wa_chats() -> list[dict]:
         raise HTTPException(status_code=502, detail=f"WhatsApp bridge error: {e}") from e
 
 
-async def get_chat_messages(chat_id: str, limit: int = 200) -> list[dict]:
-    """Fetch historical text messages from a chat via the bridge."""
+async def get_chat_messages(chat_id: str, limit: int = 200) -> tuple[str | None, list[dict]]:
+    """
+    Fetch historical text messages from a chat via the bridge.
+    Returns (chat_name, messages) tuple.
+    """
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.get(
@@ -63,7 +66,11 @@ async def get_chat_messages(chat_id: str, limit: int = 200) -> list[dict]:
             if resp.status_code == 404:
                 raise HTTPException(status_code=404, detail=f"Chat {chat_id} not found")
             resp.raise_for_status()
-            return resp.json()
+            data = resp.json()
+            # Support both new {chat_name, messages} format and legacy array format
+            if isinstance(data, list):
+                return None, data
+            return data.get("chat_name"), data.get("messages", [])
     except HTTPException:
         raise
     except httpx.HTTPError as e:

@@ -26,6 +26,8 @@ class DetectedOccasion(Base):
         ForeignKey("contacts.id", ondelete="SET NULL"), nullable=True
     )
     match_score: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    sender_jid: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    sender_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
     created_occasion_id: Mapped[int | None] = mapped_column(
         ForeignKey("occasions.id", ondelete="SET NULL"), nullable=True

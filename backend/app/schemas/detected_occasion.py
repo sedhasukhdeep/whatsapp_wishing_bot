@@ -26,6 +26,8 @@ class DetectedOccasionOut(BaseModel):
     confidence: str
     matched_contact_id: int | None
     match_score: int | None
+    sender_jid: str | None = None
+    sender_name: str | None = None
     status: str
     created_occasion_id: int | None
     created_at: datetime

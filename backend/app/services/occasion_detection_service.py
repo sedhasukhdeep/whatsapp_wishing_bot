@@ -304,7 +304,14 @@ def _load_detection_settings(db) -> tuple[list[str], list[dict]]:
 
 
 async def process_message_for_occasion(
-    chat_id: str, message_id: str, body: str, db, timestamp: int | None = None
+    chat_id: str,
+    message_id: str,
+    body: str,
+    db,
+    timestamp: int | None = None,
+    chat_name: str | None = None,
+    sender_jid: str | None = None,
+    sender_name: str | None = None,
 ) -> None:
     """
     Full detection pipeline: pre-filter → dedupe → load contacts → resolve/detect → persist.
@@ -312,8 +319,10 @@ async def process_message_for_occasion(
     Step 1 (1:1 chat): If chat_id is @c.us, resolve the contact directly by phone number.
     Step 2 (group chat): AI-driven detection + matching against full contact list.
 
-    timestamp: Unix epoch seconds from the message (used to infer occasion date when AI can't).
-    Designed to be called from the webhook; all failures are caught and logged.
+    chat_name:   display name of the chat/group (from bridge)
+    sender_jid:  JID of the message sender (non-null for group messages)
+    sender_name: WhatsApp push name of the sender
+    timestamp:   Unix epoch seconds (used to infer occasion date when AI can't extract one)
     """
     from app.models.contact import Contact
     from app.models.detected_occasion import DetectedOccasion
@@ -345,6 +354,16 @@ async def process_message_for_occasion(
     # Load contacts so the AI can match against them
     contacts = db.query(Contact).all()
 
+    # Resolve sender display name: contact name > WA push name > phone from JID
+    resolved_sender = sender_name
+    if sender_jid:
+        sender_contact = resolve_contact_by_jid(sender_jid, contacts)
+        if sender_contact:
+            resolved_sender = sender_contact.name
+        elif not resolved_sender:
+            phone = re.sub(r"\D", "", sender_jid.split("@")[0])
+            resolved_sender = f"+{phone}" if phone else None
+
     # Step 1: 1:1 chat — resolve contact directly by phone from JID
     direct_contact = None
     if not chat_id.endswith("@g.us") and not chat_id.endswith("@broadcast"):
@@ -366,7 +385,6 @@ async def process_message_for_occasion(
         detected_year = result.get("year")
         confidence = result.get("confidence", "medium")
     else:
-        # Forced by custom keyword with no AI extraction
         detected_name = ""
         occasion_type = "custom"
         occasion_label = None
@@ -395,7 +413,6 @@ async def process_message_for_occasion(
         matched_contact_id = direct_contact.id
         matched_contact = direct_contact
     else:
-        # Step 2: use AI-suggested contact id (validated against actual contacts)
         matched_contact_id = _validate_contact_id(result.get("matched_contact_id") if result else None, contacts)
         matched_contact = next((c for c in contacts if c.id == matched_contact_id), None)
 
@@ -405,6 +422,9 @@ async def process_message_for_occasion(
     detection = DetectedOccasion(
         message_id=message_id,
         source_chat_id=chat_id,
+        source_chat_name=chat_name,
+        sender_jid=sender_jid,
+        sender_name=resolved_sender,
         raw_message=body[:2000],
         detected_name=detected_name,
         occasion_type=occasion_type,
@@ -420,15 +440,16 @@ async def process_message_for_occasion(
     db.add(detection)
     db.commit()
     logger.info(
-        "Detected %s for '%s' (confidence=%s, contact_match=%s) in chat %s",
+        "Detected %s for '%s' (confidence=%s, contact_match=%s, sender=%s) in chat %s",
         occasion_type, detected_name, confidence,
         matched_contact.name if matched_contact else "none",
+        resolved_sender or "unknown",
         chat_id,
     )
 
 
 async def scan_group_chat_for_occasions(
-    chat_id: str, messages: list, db
+    chat_id: str, messages: list, db, chat_name: str | None = None
 ) -> int:
     """
     Process historical group chat messages as daily context windows.
@@ -517,6 +538,7 @@ async def scan_group_chat_for_occasions(
         detection = DetectedOccasion(
             message_id=synthetic_id,
             source_chat_id=chat_id,
+            source_chat_name=chat_name,
             raw_message="\n".join(m["body"] for m in day_msgs)[:2000],
             detected_name=detected_name,
             occasion_type=occasion_type,

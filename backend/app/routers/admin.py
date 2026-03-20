@@ -114,11 +114,15 @@ async def wa_webhook(body: WAWebhookPayload, db: Session = Depends(get_db)):
 
     # Run occasion detection on ALL incoming messages (non-blocking, silent fail)
     try:
-        await process_message_for_occasion(body.chat_id, body.message_id, body.body, db, timestamp=body.timestamp)
+        await process_message_for_occasion(
+            body.chat_id, body.message_id, body.body, db,
+            timestamp=body.timestamp,
+            chat_name=body.chat_name,
+            sender_jid=body.author,
+            sender_name=body.sender_name,
+        )
     except Exception:
         logger.exception("Occasion detection failed for message %s", body.message_id)
-    # Note: live webhook uses process_message_for_occasion which handles 1:1 phone resolution.
-    # Group thank-you pattern is used in historical scan (scan_group_chat_for_occasions).
 
     admin_chat_id = get_setting(db, "admin_wa_chat_id")
     enabled = get_setting(db, "admin_notifications_enabled") == "true"

@@ -266,6 +266,8 @@ export interface DetectedOccasion {
   matched_contact_id: number | null;
   matched_contact_name: string | null;
   match_score: number | null;
+  sender_jid: string | null;
+  sender_name: string | null;
   status: DetectionStatus;
   created_occasion_id: number | null;
   created_at: string;
