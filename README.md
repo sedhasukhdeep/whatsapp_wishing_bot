@@ -6,39 +6,50 @@ A personal web app that sends AI-generated birthday, anniversary, and occasion g
 
 ## Quick Start (no terminal needed)
 
-The only prerequisite is **Docker Desktop**.
+### Step 1 — Install Docker Desktop
 
-| Platform | Download |
+Docker Desktop runs the app in the background. Install it once and you're done.
+
+| Your computer | Download link |
 |---|---|
-| Mac | [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/) |
-| Windows | [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/) |
+| Mac (Apple Silicon) | [Docker Desktop for Mac (Apple chip)](https://desktop.docker.com/mac/main/arm64/Docker.dmg) |
+| Mac (Intel) | [Docker Desktop for Mac (Intel chip)](https://desktop.docker.com/mac/main/amd64/Docker.dmg) |
+| Windows | [Docker Desktop for Windows](https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe) |
 | Linux | [Docker Desktop for Linux](https://docs.docker.com/desktop/install/linux-install/) |
 
-### 1. Download the app
+After installing, open Docker Desktop and wait until it says **"Docker Desktop is running"** in the taskbar/menu bar.
 
-Click **Code → Download ZIP** on GitHub, then unzip it anywhere you like.
+### Step 2 — Download Wishing Bot
 
-### 2. Run the setup wizard
+Click the green **Code** button on this page → **Download ZIP**, then unzip it anywhere on your computer (e.g. your Desktop).
 
-| Platform | Double-click |
+### Step 3 — Run the setup wizard
+
+Open the unzipped folder and double-click the setup file for your platform:
+
+| Platform | Double-click this file |
 |---|---|
 | Mac / Linux | `setup.command` |
 | Windows | `setup.bat` |
 
-The wizard checks Docker, asks for an AI API key (or lets you use a local model), picks your timezone, builds the containers, and starts the app — all with Next/Skip buttons.
+The wizard will:
+1. Confirm Docker is running
+2. Ask for an AI API key (Claude, OpenAI, or Gemini) — or skip to use a local model
+3. Pick your timezone for the 8 AM daily scheduler
+4. Build and start the app automatically
 
-> **macOS:** If `setup.command` is blocked by Gatekeeper, right-click it and choose **Open**.
+> **macOS only:** If you see "cannot be opened because it is from an unidentified developer", right-click the file and choose **Open**, then click Open again.
 
-### 3. Connect WhatsApp
+### Step 4 — Connect WhatsApp
 
-Once the app opens, go to **WhatsApp** in the sidebar and scan the QR code with your phone. You only need to do this once — the session is saved.
+Once the app opens in your browser, go to **WhatsApp** in the sidebar and scan the QR code with your phone. You only need to do this once — the session is saved.
 
-### Starting and stopping
+### Starting and stopping (after setup)
 
-| Platform | Start | Stop |
+| Platform | Start the app | Stop the app |
 |---|---|---|
-| Mac / Linux | `start.command` | `stop.command` |
-| Windows | `start.bat` | `stop.bat` |
+| Mac / Linux | Double-click `start.command` | Double-click `stop.command` |
+| Windows | Double-click `start.bat` | Double-click `stop.bat` |
 
 ---
 

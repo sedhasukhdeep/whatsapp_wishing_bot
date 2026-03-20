@@ -16,5 +16,5 @@ if [ -f ".env" ]; then
   exit 0
 fi
 
-python3 setup-wizard.py
+python3 scripts/setup-wizard.py
 read -r -p "Press Enter to close..."

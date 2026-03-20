@@ -16,7 +16,7 @@ import webbrowser
 from pathlib import Path
 
 PORT = 8765
-ROOT = Path(__file__).parent.resolve()
+ROOT = Path(__file__).parent.parent.resolve()
 
 HTML = r"""<!DOCTYPE html>
 <html lang="en">

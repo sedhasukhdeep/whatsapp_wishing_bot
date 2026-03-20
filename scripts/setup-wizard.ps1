@@ -2,8 +2,7 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-$ScriptDir = $PSScriptRoot
-if (-not $ScriptDir) { $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$ScriptDir = Split-Path -Parent ($PSScriptRoot ?? (Split-Path -Parent $MyInvocation.MyCommand.Definition))
 
 # ── Helper: compose command ──────────────────────────────────────────────────
 function Get-ComposeCmd {
