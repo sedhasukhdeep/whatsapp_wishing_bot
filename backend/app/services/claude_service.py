@@ -163,9 +163,6 @@ async def _generate_local(prompt: str, model: str, local_ai_url: str) -> str:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ],
-        # Disable thinking mode for Qwen3 and compatible models.
-        # LM Studio accepts enable_thinking at the top level; Ollama via chat_template_kwargs.
-        extra_body={"enable_thinking": False, "chat_template_kwargs": {"enable_thinking": False}},
     )
     text = response.choices[0].message.content.strip()
     return _extract_clean_message(text)
@@ -306,7 +303,6 @@ async def call_ai_raw(system_prompt: str, user_message: str, db=None, max_tokens
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message},
             ],
-            extra_body={"enable_thinking": False, "chat_template_kwargs": {"enable_thinking": False}},
         )
         return response.choices[0].message.content.strip()
 
