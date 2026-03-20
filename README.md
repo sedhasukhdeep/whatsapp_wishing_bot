@@ -46,10 +46,12 @@ Once the app opens in your browser, go to **WhatsApp** in the sidebar and scan t
 
 ### Starting and stopping (after setup)
 
-| Platform | Start the app | Stop the app |
-|---|---|---|
-| Mac / Linux | Double-click `start.command` | Double-click `stop.command` |
-| Windows | Double-click `start.bat` | Double-click `stop.bat` |
+| Platform | Double-click |
+|---|---|
+| Mac / Linux | `start.command` |
+| Windows | `start.bat` |
+
+If the app is **not running** it starts and opens your browser. If it's **already running** it gives you options to stop it or open it in the browser.
 
 ---
 
