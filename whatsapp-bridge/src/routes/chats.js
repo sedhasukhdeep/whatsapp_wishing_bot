@@ -8,8 +8,22 @@ router.get('/chats', async (_req, res) => {
   if (!ready) {
     return res.status(503).json({ error: 'WhatsApp not connected' });
   }
+  // getChats() can fail transiently while WA Web is still syncing — retry once
+  let chats;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      chats = await client.getChats();
+      break;
+    } catch (err) {
+      console.error(`[WA] getChats error (attempt ${attempt}):`, err.message);
+      if (attempt === 2) {
+        return res.status(500).json({ error: err.message });
+      }
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+
   try {
-    const chats = await client.getChats();
     const result = chats.map((chat) => ({
       id: chat.id._serialized,
       name: chat.name,
@@ -22,7 +36,7 @@ router.get('/chats', async (_req, res) => {
     });
     return res.json(result);
   } catch (err) {
-    console.error('[WA] getChats error:', err);
+    console.error('[WA] getChats mapping error:', err);
     return res.status(500).json({ error: err.message });
   }
 });

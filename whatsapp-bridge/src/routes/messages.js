@@ -15,9 +15,10 @@ router.get('/messages/:chatId', async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 200, 1000);
 
   try {
-    const chats = await client.getChats();
-    const chat = chats.find((c) => c.id._serialized === chatId);
-    if (!chat) {
+    let chat;
+    try {
+      chat = await client.getChatById(chatId);
+    } catch (_) {
       return res.status(404).json({ error: 'Chat not found' });
     }
 
