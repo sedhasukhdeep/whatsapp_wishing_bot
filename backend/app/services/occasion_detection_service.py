@@ -12,12 +12,20 @@ Multi-step contact resolution:
 Uses the app-wide AI provider (configured in Settings) via call_ai_raw.
 """
 
+import asyncio
 import json
 import logging
 import re
 from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
+
+# Prevents concurrent AI calls — local LLMs handle one request at a time
+_ai_semaphore = asyncio.Semaphore(1)
+
+# Prevents the same message_id being processed twice concurrently
+# (e.g. if the bridge fires both 'message' and 'message_create' for the same msg)
+_in_progress_ids: set[str] = set()
 
 # Keywords that suggest an occasion message — cheap pre-filter before AI call
 _OCCASION_PATTERN = re.compile(
@@ -86,9 +94,19 @@ def is_likely_occasion_message(text: str) -> bool:
 
 def _parse_detection_response(raw: str) -> dict | None:
     """Strip thinking tags and parse JSON from the AI response."""
+    # Strip complete <think>...</think> blocks
     cleaned = _THINKING_TAG_RE.sub("", raw).strip()
+    # Strip truncated/unclosed <think> block (model cut off mid-reasoning)
+    cleaned = re.sub(r"<think(?:ing)?>.*$", "", cleaned, flags=re.DOTALL | re.IGNORECASE).strip()
     if cleaned.startswith("```"):
         cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.DOTALL).strip()
+    # Try extracting a JSON object even if there's surrounding text
+    json_match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+    if json_match:
+        try:
+            return json.loads(json_match.group(0))
+        except json.JSONDecodeError:
+            pass
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
@@ -174,13 +192,18 @@ async def detect_occasion_from_message(text: str, contacts: list, db) -> dict | 
     contacts_context = _build_contacts_context(contacts)
     user_message = f"{contacts_context}\n\nMessage: {text}"
 
+    logger.info("Detection user prompt:\n%s", user_message)
+
     try:
-        raw = await call_ai_raw(DETECTION_SYSTEM_PROMPT, user_message, db=db, max_tokens=200)
+        async with _ai_semaphore:
+            raw = await call_ai_raw(DETECTION_SYSTEM_PROMPT, user_message, db=db, max_tokens=600)
     except Exception as e:
         logger.warning("Occasion detection: AI call failed (%s) — skipping", e)
         return None
 
+    logger.info("Detection raw AI response: %r", raw[:600])
     result = _parse_detection_response(raw)
+    logger.info("Detection parsed result: %s", result)
     if not result or not result.get("detected"):
         return None
     return result
@@ -248,7 +271,8 @@ async def analyze_group_context_window(
     )
 
     try:
-        raw = await call_ai_raw(GROUP_CONTEXT_SYSTEM_PROMPT, user_message, db=db, max_tokens=200)
+        async with _ai_semaphore:
+            raw = await call_ai_raw(GROUP_CONTEXT_SYSTEM_PROMPT, user_message, db=db, max_tokens=600)
     except Exception as e:
         logger.warning("Group context analysis: AI call failed (%s) — skipping", e)
         return None
@@ -347,6 +371,33 @@ async def process_message_for_occasion(
     sender_name: WhatsApp push name of the sender
     timestamp:   Unix epoch seconds (used to infer occasion date when AI can't extract one)
     """
+    from app.models.contact import Contact
+    from app.models.detected_occasion import DetectedOccasion
+
+    # Guard against duplicate concurrent processing of the same message_id
+    if message_id in _in_progress_ids:
+        return
+    _in_progress_ids.add(message_id)
+    try:
+        await _process_message_inner(
+            chat_id, message_id, body, db,
+            timestamp=timestamp, chat_name=chat_name,
+            sender_jid=sender_jid, sender_name=sender_name,
+        )
+    finally:
+        _in_progress_ids.discard(message_id)
+
+
+async def _process_message_inner(
+    chat_id: str,
+    message_id: str,
+    body: str,
+    db,
+    timestamp: int | None = None,
+    chat_name: str | None = None,
+    sender_jid: str | None = None,
+    sender_name: str | None = None,
+) -> None:
     from app.models.contact import Contact
     from app.models.detected_occasion import DetectedOccasion
 
