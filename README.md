@@ -67,10 +67,11 @@ npm install
 
 ```bash
 cd ..
-./start.sh
+./start.sh        # start all services
+./start.sh stop   # stop all services
 ```
 
-This starts all three services, runs migrations, and opens the app at **http://localhost:5173**.
+This starts all three services, runs migrations, and opens the app at **http://localhost:5173**. Run `./start.sh stop` from any terminal to kill all three services cleanly.
 
 Or run each service manually in separate terminals:
 
