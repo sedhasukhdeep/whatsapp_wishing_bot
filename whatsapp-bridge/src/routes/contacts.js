@@ -1,7 +1,37 @@
 const { Router } = require('express');
-const { client, getStatus } = require('../client');
+const { client, getStatus, handleDetachedFrame } = require('../client');
 
 const router = Router();
+
+router.get('/group-members/:chatId', async (req, res) => {
+  const { ready } = getStatus();
+  if (!ready) return res.status(503).json({ error: 'WhatsApp not connected' });
+
+  const { chatId } = req.params;
+  try {
+    let chat;
+    try {
+      chat = await client.getChatById(chatId);
+    } catch (_) {
+      return res.status(404).json({ error: 'Chat not found' });
+    }
+    if (!chat.isGroup) {
+      return res.status(400).json({ error: 'Chat is not a group' });
+    }
+    const participants = (chat.participants || []).map((p) => ({
+      jid: p.id._serialized,
+      phone: '+' + p.id.user,
+    }));
+    return res.json({ group_name: chat.name, participants });
+  } catch (err) {
+    console.error(`[WA] group-members error for ${chatId}:`, err.message);
+    if (err.message && err.message.includes('detached Frame')) {
+      handleDetachedFrame();
+      return res.status(503).json({ error: 'WhatsApp not connected' });
+    }
+    return res.status(500).json({ error: err.message });
+  }
+});
 
 router.get('/wa-contacts', async (_req, res) => {
   const { ready } = getStatus();

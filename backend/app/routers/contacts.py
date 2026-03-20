@@ -6,15 +6,18 @@ from sqlalchemy.orm import Session, selectinload
 from app.database import get_db
 from app.models import Contact
 from app.schemas.contact import (
+    BulkTagRequest,
+    BulkTagResult,
     ContactCreate,
     ContactOut,
     ContactUpdate,
     ContactWithOccasions,
+    GroupTagPreviewItem,
     WaSyncImportRequest,
     WaSyncImportResult,
     WaSyncPreviewItem,
 )
-from app.services.whatsapp_service import get_wa_contacts
+from app.services.whatsapp_service import get_group_members, get_wa_contacts
 
 router = APIRouter(prefix="/api/contacts", tags=["contacts"])
 
@@ -60,6 +63,40 @@ async def wa_sync_import(body: WaSyncImportRequest, db: Session = Depends(get_db
         created += 1
     db.commit()
     return WaSyncImportResult(created=created, skipped=skipped)
+
+
+@router.get("/group-tag-preview", response_model=list[GroupTagPreviewItem])
+async def group_tag_preview(group_id: str, db: Session = Depends(get_db)):
+    data = await get_group_members(group_id)
+    participants = data.get("participants", [])
+    contacts = db.query(Contact).all()
+    phone_to_contact = {c.phone: c for c in contacts}
+    result = []
+    for p in participants:
+        contact = phone_to_contact.get(p["phone"])
+        if contact:
+            result.append(
+                GroupTagPreviewItem(
+                    contact_id=contact.id,
+                    name=contact.name,
+                    phone=contact.phone,
+                    current_relationship=contact.relationship,
+                )
+            )
+    return result
+
+
+@router.post("/bulk-tag", response_model=BulkTagResult)
+def bulk_tag_contacts(body: BulkTagRequest, db: Session = Depends(get_db)):
+    if not body.contact_ids:
+        return BulkTagResult(updated=0)
+    updated = (
+        db.query(Contact)
+        .filter(Contact.id.in_(body.contact_ids))
+        .update({"relationship": body.relationship}, synchronize_session=False)
+    )
+    db.commit()
+    return BulkTagResult(updated=updated)
 
 
 @router.delete("", status_code=200)

@@ -72,6 +72,19 @@ export const getWaSyncPreview = () =>
 export const importWaContacts = (items: WaSyncImportItem[]) =>
   api.post<{ created: number; skipped: number }>('/api/contacts/wa-sync/import', { items }).then((r) => r.data);
 
+export interface GroupTagPreviewItem {
+  contact_id: number;
+  name: string;
+  phone: string;
+  current_relationship: string;
+}
+
+export const getGroupTagPreview = (groupId: string) =>
+  api.get<GroupTagPreviewItem[]>('/api/contacts/group-tag-preview', { params: { group_id: groupId } }).then((r) => r.data);
+
+export const bulkTagContacts = (contactIds: number[], relationship: string) =>
+  api.post<{ updated: number }>('/api/contacts/bulk-tag', { contact_ids: contactIds, relationship }).then((r) => r.data);
+
 // Occasions
 export const listOccasions = (contactId: number) =>
   api.get<Occasion[]>('/api/occasions', { params: { contact_id: contactId } }).then((r) => r.data);

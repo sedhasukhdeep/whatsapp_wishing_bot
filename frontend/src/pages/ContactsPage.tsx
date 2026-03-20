@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { deleteAllContacts, deleteContact, getWaSyncPreview, importWaContacts, listContacts } from '../api/client';
+import {
+  bulkTagContacts,
+  deleteAllContacts,
+  deleteContact,
+  getGroupTagPreview,
+  getWaChats,
+  getWaSyncPreview,
+  importWaContacts,
+  listContacts,
+} from '../api/client';
+import type { GroupTagPreviewItem, WaChat } from '../api/client';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import type { Contact, RelationshipType, WaSyncImportItem, WaSyncPreviewItem } from '../types';
 import { Button } from '@/components/ui/button';
@@ -21,17 +31,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Smartphone, Trash2, Upload, UserPlus, Users } from 'lucide-react';
+import { Loader2, Smartphone, Tag, Trash2, Upload, UserPlus, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const RELATIONSHIPS: RelationshipType[] = ['family', 'friend', 'colleague', 'acquaintance', 'other'];
 
 const REL_COLORS: Record<string, string> = {
-  family: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
-  friend: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-  colleague: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-  acquaintance: 'bg-muted text-muted-foreground',
-  other: 'bg-muted text-muted-foreground',
+  family: 'bg-amber-500 text-white',
+  friend: 'bg-blue-500 text-white',
+  colleague: 'bg-purple-500 text-white',
+  acquaintance: 'bg-slate-400 text-white',
+  other: 'bg-slate-400 text-white',
 };
 
 export default function ContactsPage() {
@@ -51,6 +61,19 @@ export default function ContactsPage() {
   const [syncRels, setSyncRels] = useState<Record<string, RelationshipType>>({});
   const [syncImporting, setSyncImporting] = useState(false);
   const [syncResult, setSyncResult] = useState<{ created: number; skipped: number } | null>(null);
+
+  // Group tag dialog state
+  const [groupTagOpen, setGroupTagOpen] = useState(false);
+  const [groupTagGroups, setGroupTagGroups] = useState<WaChat[]>([]);
+  const [groupTagGroupSearch, setGroupTagGroupSearch] = useState('');
+  const [groupTagGroupId, setGroupTagGroupId] = useState('');
+  const [groupTagLoading, setGroupTagLoading] = useState(false);
+  const [groupTagError, setGroupTagError] = useState('');
+  const [groupTagMatches, setGroupTagMatches] = useState<GroupTagPreviewItem[]>([]);
+  const [groupTagRel, setGroupTagRel] = useState<RelationshipType>('friend');
+  const [groupTagChecked, setGroupTagChecked] = useState<Set<number>>(new Set());
+  const [groupTagApplying, setGroupTagApplying] = useState(false);
+  const [groupTagResult, setGroupTagResult] = useState<{ updated: number } | null>(null);
 
   useEffect(() => {
     listContacts(search, rel).then(setContacts);
@@ -129,6 +152,71 @@ export default function ContactsPage() {
     }
   }
 
+  async function openGroupTagDialog() {
+    setGroupTagOpen(true);
+    setGroupTagGroupId('');
+    setGroupTagGroupSearch('');
+    setGroupTagMatches([]);
+    setGroupTagError('');
+    setGroupTagResult(null);
+    setGroupTagLoading(true);
+    try {
+      const chats = await getWaChats();
+      setGroupTagGroups(chats.filter((c) => c.type === 'group'));
+    } catch (err: unknown) {
+      setGroupTagError(err instanceof Error ? err.message : 'Failed to load groups');
+    } finally {
+      setGroupTagLoading(false);
+    }
+  }
+
+  async function handleGroupSelect(groupId: string) {
+    setGroupTagGroupId(groupId);
+    setGroupTagMatches([]);
+    setGroupTagError('');
+    setGroupTagResult(null);
+    if (!groupId) return;
+    setGroupTagLoading(true);
+    try {
+      const matches = await getGroupTagPreview(groupId);
+      setGroupTagMatches(matches);
+      setGroupTagChecked(new Set(matches.map((m) => m.contact_id)));
+    } catch (err: unknown) {
+      setGroupTagError(err instanceof Error ? err.message : 'Failed to load group members');
+    } finally {
+      setGroupTagLoading(false);
+    }
+  }
+
+  function toggleGroupTagOne(id: number) {
+    setGroupTagChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleGroupTagApply() {
+    const ids = [...groupTagChecked];
+    if (!ids.length) return;
+    setGroupTagApplying(true);
+    setGroupTagError('');
+    try {
+      const result = await bulkTagContacts(ids, groupTagRel);
+      setGroupTagResult(result);
+      listContacts(search, rel).then(setContacts);
+    } catch (err: unknown) {
+      setGroupTagError(err instanceof Error ? err.message : 'Failed to apply tags');
+    } finally {
+      setGroupTagApplying(false);
+    }
+  }
+
+  const filteredGroups = groupTagGroups.filter((g) =>
+    g.name.toLowerCase().includes(groupTagGroupSearch.toLowerCase())
+  );
+
   const newCount = syncPreview.filter((p) => !p.already_exists).length;
   const checkedCount = [...syncChecked].filter((phone) =>
     syncPreview.find((p) => p.phone === phone && !p.already_exists)
@@ -150,6 +238,10 @@ export default function ContactsPage() {
               Delete All
             </Button>
           )}
+          <Button variant="outline" onClick={openGroupTagDialog} className="gap-2">
+            <Tag size={16} />
+            Tag by Group
+          </Button>
           <Button variant="outline" onClick={openSyncDialog} className="gap-2">
             <Smartphone size={16} />
             Sync WhatsApp
@@ -258,6 +350,167 @@ export default function ContactsPage() {
         />
       )}
 
+      {/* Tag by Group Dialog */}
+      <Dialog open={groupTagOpen} onOpenChange={(open) => { if (!open) setGroupTagOpen(false); }}>
+        <DialogContent className="max-w-xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Tag Contacts by Group</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto space-y-4">
+            {groupTagError && (
+              <div className="rounded-md bg-destructive/10 text-destructive text-sm p-3">
+                {groupTagError}
+              </div>
+            )}
+
+            {groupTagResult ? (
+              <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
+                <div className="text-3xl font-bold">{groupTagResult.updated}</div>
+                <div className="text-base font-semibold">
+                  contact{groupTagResult.updated !== 1 ? 's' : ''} tagged as{' '}
+                  <span className="capitalize">{groupTagRel}</span>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Group search */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Select group</label>
+                  {groupTagLoading && !groupTagGroupId && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                      <Loader2 size={14} className="animate-spin" />
+                      Loading groups…
+                    </div>
+                  )}
+                  {!groupTagLoading && groupTagGroups.length > 0 && (
+                    <>
+                      <Input
+                        placeholder="Search groups…"
+                        value={groupTagGroupSearch}
+                        onChange={(e) => setGroupTagGroupSearch(e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                      <div className="border rounded-md max-h-40 overflow-auto">
+                        {filteredGroups.length === 0 ? (
+                          <p className="text-sm text-muted-foreground p-3">No groups match</p>
+                        ) : (
+                          filteredGroups.map((g) => (
+                            <button
+                              key={g.id}
+                              onClick={() => handleGroupSelect(g.id)}
+                              className={cn(
+                                'w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors',
+                                groupTagGroupId === g.id && 'bg-primary/10 font-medium'
+                              )}
+                            >
+                              {g.name}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Matched contacts */}
+                {groupTagGroupId && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">
+                        Matched contacts{groupTagMatches.length > 0 ? ` (${groupTagMatches.length})` : ''}
+                      </label>
+                      {groupTagMatches.length > 0 && (
+                        <button
+                          className="text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => {
+                            if (groupTagChecked.size === groupTagMatches.length) {
+                              setGroupTagChecked(new Set());
+                            } else {
+                              setGroupTagChecked(new Set(groupTagMatches.map((m) => m.contact_id)));
+                            }
+                          }}
+                        >
+                          {groupTagChecked.size === groupTagMatches.length ? 'Deselect all' : 'Select all'}
+                        </button>
+                      )}
+                    </div>
+
+                    {groupTagLoading ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                        <Loader2 size={14} className="animate-spin" />
+                        Loading members…
+                      </div>
+                    ) : groupTagMatches.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-2">
+                        No contacts from this group are in your contacts list.
+                      </p>
+                    ) : (
+                      <div className="border rounded-md max-h-48 overflow-auto">
+                        {groupTagMatches.map((m) => (
+                          <label
+                            key={m.contact_id}
+                            className="flex items-center gap-3 px-3 py-2 hover:bg-muted cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={groupTagChecked.has(m.contact_id)}
+                              onChange={() => toggleGroupTagOne(m.contact_id)}
+                              className="h-4 w-4 accent-primary"
+                            />
+                            <span className="flex-1 text-sm font-medium">{m.name}</span>
+                            <span className="text-xs text-muted-foreground">{m.phone}</span>
+                            <Badge className={cn('text-xs px-2 py-0 border-0', REL_COLORS[m.current_relationship] ?? REL_COLORS.other)}>
+                              {m.current_relationship}
+                            </Badge>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Relationship picker */}
+                {groupTagMatches.length > 0 && (
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium whitespace-nowrap">Tag as</label>
+                    <Select value={groupTagRel} onValueChange={(v) => setGroupTagRel(v as RelationshipType)}>
+                      <SelectTrigger className="h-8 w-40 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {RELATIONSHIPS.map((r) => (
+                          <SelectItem key={r} value={r} className="text-sm capitalize">
+                            {r}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          <DialogFooter className="pt-4 border-t mt-0">
+            {groupTagResult ? (
+              <Button onClick={() => setGroupTagOpen(false)}>Close</Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setGroupTagOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={handleGroupTagApply}
+                  disabled={groupTagApplying || groupTagChecked.size === 0}
+                >
+                  {groupTagApplying && <Loader2 size={14} className="animate-spin mr-1" />}
+                  Apply to {groupTagChecked.size > 0 ? groupTagChecked.size : ''} contact{groupTagChecked.size !== 1 ? 's' : ''}
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* WhatsApp Sync Dialog */}
       <Dialog open={syncOpen} onOpenChange={(open) => { if (!open) setSyncOpen(false); }}>
         <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
@@ -280,9 +533,12 @@ export default function ContactsPage() {
             )}
 
             {syncResult && (
-              <div className="rounded-md bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 text-sm p-4">
-                Imported {syncResult.created} contact{syncResult.created !== 1 ? 's' : ''}.
-                {syncResult.skipped > 0 && ` ${syncResult.skipped} skipped (already exist).`}
+              <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
+                <div className="text-3xl font-bold">{syncResult.created}</div>
+                <div className="text-base font-semibold">contact{syncResult.created !== 1 ? 's' : ''} imported</div>
+                {syncResult.skipped > 0 && (
+                  <div className="text-sm text-muted-foreground">{syncResult.skipped} already existed and were skipped</div>
+                )}
               </div>
             )}
 

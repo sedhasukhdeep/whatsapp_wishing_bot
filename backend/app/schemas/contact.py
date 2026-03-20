@@ -93,3 +93,19 @@ class WaSyncImportRequest(BaseModel):
 class WaSyncImportResult(BaseModel):
     created: int
     skipped: int
+
+
+class GroupTagPreviewItem(BaseModel):
+    contact_id: int
+    name: str
+    phone: str
+    current_relationship: RelationshipType
+
+
+class BulkTagRequest(BaseModel):
+    contact_ids: list[int]
+    relationship: RelationshipType
+
+
+class BulkTagResult(BaseModel):
+    updated: int

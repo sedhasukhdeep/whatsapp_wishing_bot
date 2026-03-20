@@ -77,6 +77,25 @@ async def get_chat_messages(chat_id: str, limit: int = 200) -> tuple[str | None,
         raise HTTPException(status_code=502, detail=f"WhatsApp bridge error: {e}") from e
 
 
+async def get_group_members(group_id: str) -> dict:
+    """Fetch group participants from the bridge. Returns {group_name, participants: [{jid, phone}]}."""
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(f"{settings.wa_bridge_url}/group-members/{group_id}")
+            if resp.status_code == 503:
+                raise HTTPException(status_code=503, detail="WhatsApp not connected — scan QR code first")
+            if resp.status_code == 404:
+                raise HTTPException(status_code=404, detail=f"Group {group_id} not found")
+            if resp.status_code == 400:
+                raise HTTPException(status_code=400, detail=resp.json().get("error", "Not a group"))
+            resp.raise_for_status()
+            return resp.json()
+    except HTTPException:
+        raise
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"WhatsApp bridge error: {e}") from e
+
+
 async def send_whatsapp_gif(chat_id: str, gif_url: str, caption: str = "") -> dict:
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
