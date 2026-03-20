@@ -98,6 +98,74 @@ test.describe('Contact editing', () => {
   });
 });
 
+test.describe('Contact alias', () => {
+  let contactId: number;
+
+  test.beforeEach(async ({ request }) => {
+    const c = await createContact(request, `E2E Alias ${ts()}`);
+    contactId = c.id;
+  });
+
+  test.afterEach(async ({ request }) => {
+    await cleanupContact(request, contactId);
+  });
+
+  test('alias field appears in Basic Info and saves', async ({ page, request }) => {
+    await page.goto(`/contacts/${contactId}/edit`);
+
+    await page.getByPlaceholder('e.g. Maa, Bhai, Di...').fill('Bhai');
+
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes(`/api/contacts/${contactId}`) && r.request().method() === 'PUT'),
+      page.getByRole('button', { name: 'Save Contact' }).click(),
+    ]);
+
+    const res = await request.get(`${API}/api/contacts/${contactId}`);
+    const contact = await res.json() as { alias: string };
+    expect(contact.alias).toBe('Bhai');
+  });
+
+  test('use alias checkbox appears only when alias is filled', async ({ page }) => {
+    await page.goto(`/contacts/${contactId}/edit`);
+    const checkbox = page.getByLabel('Use alias instead of name in broadcast messages');
+    await expect(checkbox).not.toBeVisible();
+
+    await page.getByPlaceholder('e.g. Maa, Bhai, Di...').fill('Di');
+    await expect(checkbox).toBeVisible();
+  });
+
+  test('use_alias_in_broadcast is saved when checkbox is checked', async ({ page, request }) => {
+    await page.goto(`/contacts/${contactId}/edit`);
+    await page.getByPlaceholder('e.g. Maa, Bhai, Di...').fill('Maa');
+    await page.getByLabel('Use alias instead of name in broadcast messages').check();
+
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes(`/api/contacts/${contactId}`) && r.request().method() === 'PUT'),
+      page.getByRole('button', { name: 'Save Contact' }).click(),
+    ]);
+
+    const res = await request.get(`${API}/api/contacts/${contactId}`);
+    const contact = await res.json() as { alias: string; use_alias_in_broadcast: boolean };
+    expect(contact.alias).toBe('Maa');
+    expect(contact.use_alias_in_broadcast).toBe(true);
+  });
+
+  test('alias field is pre-populated when editing a contact that has one', async ({ page, request }) => {
+    await request.put(`${API}/api/contacts/${contactId}`, {
+      data: {
+        name: `E2E Alias ${ts()}`, phone: `+91${Date.now().toString().slice(-10)}`,
+        relationship: 'friend', alias: 'Preloaded', use_alias_in_broadcast: true,
+        notes: null, tone_preference: 'warm', language: 'en', message_length: 'medium',
+        custom_instructions: null, whatsapp_chat_id: null, whatsapp_chat_name: null,
+      },
+    });
+
+    await page.goto(`/contacts/${contactId}/edit`);
+    await expect(page.getByPlaceholder('e.g. Maa, Bhai, Di...')).toHaveValue('Preloaded');
+    await expect(page.getByLabel('Use alias instead of name in broadcast messages')).toBeChecked();
+  });
+});
+
 test.describe('Contact search and filter', () => {
   let contactAId: number;
   let contactBId: number;

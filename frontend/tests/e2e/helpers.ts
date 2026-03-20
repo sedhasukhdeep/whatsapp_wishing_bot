@@ -12,6 +12,8 @@ export async function createContact(
       name,
       phone: `+91${Date.now().toString().slice(-10)}`,
       relationship: 'friend',
+      alias: null,
+      use_alias_in_broadcast: false,
       notes: null,
       tone_preference: 'warm',
       language: 'en',
@@ -24,6 +26,22 @@ export async function createContact(
   });
   if (!res.ok()) throw new Error(`createContact failed: ${await res.text()}`);
   return res.json() as Promise<{ id: number; name: string }>;
+}
+
+export async function createBroadcast(
+  request: APIRequestContext,
+  name: string,
+  occasionName = 'Birthday',
+) {
+  const res = await request.post(`${API}/api/broadcasts`, {
+    data: { name, occasion_name: occasionName },
+  });
+  if (!res.ok()) throw new Error(`createBroadcast failed: ${await res.text()}`);
+  return res.json() as Promise<{ id: number; name: string }>;
+}
+
+export async function cleanupBroadcast(request: APIRequestContext, id: number) {
+  await request.delete(`${API}/api/broadcasts/${id}`).catch(() => {});
 }
 
 export async function createOccasion(
