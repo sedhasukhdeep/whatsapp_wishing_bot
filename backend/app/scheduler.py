@@ -62,6 +62,7 @@ async def daily_occasion_check(db: Session | None = None) -> int:
                     generated_text=text,
                     generation_prompt=prompt,
                     status="pending",
+                    whatsapp_target_id=occ.source_target_id,
                 )
                 db.add(draft)
                 created += 1
@@ -105,12 +106,19 @@ async def process_scheduled_drafts(db: Session | None = None) -> int:
         sent = 0
         for draft in drafts:
             contact = draft.contact
-            if not contact or not contact.whatsapp_chat_id:
+            # Prefer the draft's whatsapp_target (e.g. detected group) over the contact's personal chat
+            if draft.whatsapp_target_id:
+                from app.models.whatsapp_target import WhatsAppTarget
+                target = db.get(WhatsAppTarget, draft.whatsapp_target_id)
+                send_chat_id = target.chat_id if target else (contact.whatsapp_chat_id if contact else None)
+            else:
+                send_chat_id = contact.whatsapp_chat_id if contact else None
+            if not send_chat_id:
                 logger.warning("Scheduled draft %d has no WhatsApp chat — skipping", draft.id)
                 continue
             try:
                 final_text = draft.edited_text or draft.generated_text
-                await send_whatsapp_message(contact.whatsapp_chat_id, final_text)
+                await send_whatsapp_message(send_chat_id, final_text)
                 draft.final_text = final_text
                 draft.status = "sent"
                 draft.sent_at = datetime.now(timezone.utc)

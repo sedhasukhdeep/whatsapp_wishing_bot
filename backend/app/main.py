@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import admin, broadcasts, calendar_import, contacts, dashboard, drafts, giphy, occasions, whatsapp_targets
+from app.routers import admin, broadcasts, calendar_import, contacts, dashboard, detected_occasions, drafts, giphy, occasions, whatsapp_targets
 from app.scheduler import start_scheduler, stop_scheduler
 
 
@@ -34,6 +34,7 @@ app.include_router(calendar_import.router)
 app.include_router(broadcasts.router)
 app.include_router(admin.router)
 app.include_router(giphy.router)
+app.include_router(detected_occasions.router)
 
 
 @app.get("/health")

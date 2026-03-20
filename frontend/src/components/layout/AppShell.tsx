@@ -5,17 +5,19 @@ import {
   LayoutDashboard,
   MessageSquare,
   Moon,
+  Radar,
   Radio,
   Settings,
   Sun,
   Users,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { useTheme } from './ThemeProvider';
 import OnboardingWizard from '@/components/OnboardingWizard';
+import { getDetectionsCount } from '@/api/client';
 
 const navLinks = [
   { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
@@ -24,12 +26,18 @@ const navLinks = [
   { to: '/calendar', label: 'Calendar', Icon: CalendarDays },
   { to: '/history', label: 'History', Icon: History },
   { to: '/broadcasts', label: 'Broadcasts', Icon: Radio },
+  { to: '/detections', label: 'Detections', Icon: Radar },
   { to: '/settings', label: 'Settings', Icon: Settings },
 ];
 
 export default function AppShell() {
   const { theme, toggleTheme } = useTheme();
   const [showTour, setShowTour] = useState(false);
+  const [pendingDetections, setPendingDetections] = useState(0);
+
+  useEffect(() => {
+    getDetectionsCount().then((r) => setPendingDetections(r.count)).catch(() => {});
+  }, []);
 
   return (
     <div className="flex h-screen bg-background text-foreground">
@@ -61,7 +69,12 @@ export default function AppShell() {
               }
             >
               <Icon size={16} />
-              {label}
+              <span className="flex-1">{label}</span>
+              {to === '/detections' && pendingDetections > 0 && (
+                <span className="ml-auto text-xs font-semibold bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 leading-none">
+                  {pendingDetections}
+                </span>
+              )}
             </NavLink>
           ))}
         </div>

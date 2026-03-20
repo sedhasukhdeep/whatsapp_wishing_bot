@@ -22,9 +22,17 @@ class Occasion(Base):
     language_override: Mapped[str | None] = mapped_column(String(10), nullable=True)
     length_override: Mapped[str | None] = mapped_column(String(10), nullable=True)
     custom_instructions_override: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # When set, messages for this occasion are sent to this WhatsApp target (e.g. the group
+    # where the occasion was originally detected) instead of the contact's personal chat.
+    source_target_id: Mapped[int | None] = mapped_column(
+        ForeignKey("whatsapp_targets.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
 
     contact: Mapped["Contact"] = relationship("Contact", back_populates="occasions")  # noqa: F821
     drafts: Mapped[list["MessageDraft"]] = relationship(  # noqa: F821
         "MessageDraft", back_populates="occasion", cascade="all, delete-orphan"
+    )
+    source_target: Mapped["WhatsAppTarget | None"] = relationship(  # noqa: F821
+        "WhatsAppTarget", foreign_keys=[source_target_id]
     )

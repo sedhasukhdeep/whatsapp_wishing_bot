@@ -4,6 +4,8 @@ import type {
   AISettingsUpdate,
   AIStatus,
   Broadcast,
+  DetectedOccasion,
+  DetectionConfirmRequest,
   GiphyResult,
   BroadcastWithRecipients,
   BridgeStatus,
@@ -185,3 +187,16 @@ export const getAIStatus = () =>
 // Giphy proxy
 export const searchGifs = (q: string) =>
   api.get<{ data: GiphyResult[] }>('/api/giphy/search', { params: { q } }).then((r) => r.data);
+
+// Occasion Detections
+export const listDetections = () =>
+  api.get<DetectedOccasion[]>('/api/detections').then((r) => r.data);
+
+export const getDetectionsCount = () =>
+  api.get<{ count: number }>('/api/detections/count').then((r) => r.data);
+
+export const confirmDetection = (id: number, data: DetectionConfirmRequest) =>
+  api.post<Occasion>(`/api/detections/${id}/confirm`, data).then((r) => r.data);
+
+export const dismissDetection = (id: number) =>
+  api.post(`/api/detections/${id}/dismiss`);

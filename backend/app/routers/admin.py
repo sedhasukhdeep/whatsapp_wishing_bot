@@ -110,6 +110,13 @@ async def ai_status(db: Session = Depends(get_db)):
 async def wa_webhook(body: WAWebhookPayload, db: Session = Depends(get_db)):
     from app.services.admin_wa_service import handle_command, get_setting, parse_command
     from app.services.whatsapp_service import send_whatsapp_message
+    from app.services.occasion_detection_service import process_message_for_occasion
+
+    # Run occasion detection on ALL incoming messages (non-blocking, silent fail)
+    try:
+        await process_message_for_occasion(body.chat_id, body.message_id, body.body, db)
+    except Exception:
+        logger.exception("Occasion detection failed for message %s", body.message_id)
 
     admin_chat_id = get_setting(db, "admin_wa_chat_id")
     enabled = get_setting(db, "admin_notifications_enabled") == "true"

@@ -4,6 +4,7 @@ import CalendarImportPage from './pages/CalendarImportPage';
 import ContactFormPage from './pages/ContactFormPage';
 import ContactsPage from './pages/ContactsPage';
 import DashboardPage from './pages/DashboardPage';
+import DetectionsPage from './pages/DetectionsPage';
 import TargetsPage from './pages/TargetsPage';
 import HistoryPage from './pages/HistoryPage';
 import CalendarPage from './pages/CalendarPage';
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/broadcasts" element={<BroadcastsPage />} />
           <Route path="/broadcasts/:id" element={<BroadcastDetailPage />} />
+          <Route path="/detections" element={<DetectionsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>

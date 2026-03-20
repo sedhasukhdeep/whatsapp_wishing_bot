@@ -246,6 +246,41 @@ export interface BroadcastWithRecipients extends Broadcast {
   recipients: BroadcastRecipient[];
 }
 
+// Occasion Detection
+export type DetectionStatus = 'pending' | 'confirmed' | 'dismissed';
+export type DetectionConfidence = 'low' | 'medium' | 'high';
+
+export interface DetectedOccasion {
+  id: number;
+  message_id: string;
+  source_chat_id: string;
+  source_chat_name: string | null;
+  raw_message: string;
+  detected_name: string;
+  occasion_type: OccasionType;
+  occasion_label: string | null;
+  detected_month: number | null;
+  detected_day: number | null;
+  detected_year: number | null;
+  confidence: DetectionConfidence;
+  matched_contact_id: number | null;
+  matched_contact_name: string | null;
+  match_score: number | null;
+  status: DetectionStatus;
+  created_occasion_id: number | null;
+  created_at: string;
+  matched_contact: { id: number; name: string } | null;
+}
+
+export interface DetectionConfirmRequest {
+  contact_id: number;
+  occasion_type: OccasionType;
+  month: number;
+  day: number;
+  year: number | null;
+  label: string | null;
+}
+
 // WhatsApp Contact Sync
 export interface WaSyncPreviewItem {
   phone: string;
