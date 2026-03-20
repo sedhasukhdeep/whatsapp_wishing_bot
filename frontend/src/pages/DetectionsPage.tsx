@@ -19,35 +19,67 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { History, Loader2, Radar, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, History, Loader2, Radar, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const MONTHS = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-/** Format a WhatsApp JID into a human-readable label. */
 function formatChatId(name: string | null, chatId: string): string {
   if (name) return name;
   if (chatId.endsWith('@g.us')) return 'Group chat';
-  // Individual: strip @c.us suffix and add + prefix
-  const number = chatId.replace('@c.us', '');
-  return `+${number}`;
+  return `+${chatId.replace('@c.us', '')}`;
 }
-const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
+const CONFIDENCE_RANK: Record<string, number> = { high: 2, medium: 1, low: 0 };
 const CONFIDENCE_STYLES: Record<string, string> = {
   high: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
   medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
   low: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
 };
-
 const OCCASION_LABELS: Record<string, string> = {
   birthday: '🎂 Birthday',
   anniversary: '❤️ Anniversary',
   custom: '⭐ Custom',
 };
 
+// ── Grouping ────────────────────────────────────────────────────────────────
+
+interface DetectionGroup {
+  key: string;
+  primary: DetectedOccasion;  // highest-confidence item; used to pre-fill confirm dialog
+  members: DetectedOccasion[];
+}
+
+/**
+ * Group detections that appear to be about the same occasion:
+ * same source chat + occasion type + person (by contact id if matched, else normalised name).
+ * Within a group the highest-confidence detection becomes the primary.
+ */
+function groupDetections(detections: DetectedOccasion[]): DetectionGroup[] {
+  const map = new Map<string, DetectedOccasion[]>();
+
+  for (const d of detections) {
+    const personKey = d.matched_contact?.id != null
+      ? `cid:${d.matched_contact.id}`
+      : `name:${d.detected_name.toLowerCase().trim()}`;
+    const key = `${d.source_chat_id}::${d.occasion_type}::${personKey}`;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(d);
+  }
+
+  return Array.from(map.entries()).map(([key, members]) => {
+    const sorted = [...members].sort(
+      (a, b) => (CONFIDENCE_RANK[b.confidence] ?? 0) - (CONFIDENCE_RANK[a.confidence] ?? 0)
+    );
+    return { key, primary: sorted[0], members };
+  });
+}
+
+// ── Confirm state ────────────────────────────────────────────────────────────
+
 interface ConfirmState {
-  detection: DetectedOccasion;
+  group: DetectionGroup;
   contactId: string;
   occasionType: OccasionType;
   month: string;
@@ -58,15 +90,19 @@ interface ConfirmState {
   error: string;
 }
 
+// ── Component ────────────────────────────────────────────────────────────────
+
 export default function DetectionsPage() {
   const [detections, setDetections] = useState<DetectedOccasion[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
-  const [dismissing, setDismissing] = useState<number | null>(null);
+  const [dismissingGroup, setDismissingGroup] = useState<string | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
-  // Scan history state
-  const [scanStatus, setScanStatus] = useState<{ running: boolean; scanned: number; detected: number; total: number; error: string | null } | null>(null);
+  const [scanStatus, setScanStatus] = useState<{
+    running: boolean; scanned: number; detected: number; total: number; error: string | null;
+  } | null>(null);
   const [scanError, setScanError] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -88,17 +124,13 @@ export default function DetectionsPage() {
       setScanStatus(s);
       if (!s.running) {
         stopPolling();
-        // Refresh detections list after scan completes
         listDetections().then(setDetections);
       }
     }, 2000);
   }
 
   function stopPolling() {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
   }
 
   async function handleScanHistory() {
@@ -113,9 +145,18 @@ export default function DetectionsPage() {
     }
   }
 
-  function openConfirm(d: DetectedOccasion) {
+  function toggleExpand(key: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+
+  function openConfirm(group: DetectionGroup) {
+    const d = group.primary;
     setConfirmState({
-      detection: d,
+      group,
       contactId: d.matched_contact?.id?.toString() ?? '',
       occasionType: d.occasion_type as OccasionType,
       month: d.detected_month?.toString() ?? '',
@@ -129,7 +170,7 @@ export default function DetectionsPage() {
 
   async function handleConfirm() {
     if (!confirmState) return;
-    const { detection, contactId, occasionType, month, day, year, label } = confirmState;
+    const { group, contactId, occasionType, month, day, year, label } = confirmState;
 
     if (!contactId) {
       setConfirmState((s) => s && { ...s, error: 'Please select a contact.' });
@@ -154,8 +195,13 @@ export default function DetectionsPage() {
         year: year ? parseInt(year) : null,
         label: occasionType === 'custom' ? label.trim() : null,
       };
-      await confirmDetection(detection.id, payload);
-      setDetections((prev) => prev.filter((d) => d.id !== detection.id));
+      // Confirm primary, then dismiss siblings
+      await confirmDetection(group.primary.id, payload);
+      const siblingIds = group.members.filter((m) => m.id !== group.primary.id).map((m) => m.id);
+      await Promise.all(siblingIds.map((id) => dismissDetection(id)));
+
+      const allIds = new Set(group.members.map((m) => m.id));
+      setDetections((prev) => prev.filter((d) => !allIds.has(d.id)));
       setConfirmState(null);
     } catch (err: unknown) {
       setConfirmState((s) => s && {
@@ -166,13 +212,14 @@ export default function DetectionsPage() {
     }
   }
 
-  async function handleDismiss(id: number) {
-    setDismissing(id);
+  async function handleDismissGroup(group: DetectionGroup) {
+    setDismissingGroup(group.key);
     try {
-      await dismissDetection(id);
-      setDetections((prev) => prev.filter((d) => d.id !== id));
+      await Promise.all(group.members.map((m) => dismissDetection(m.id)));
+      const allIds = new Set(group.members.map((m) => m.id));
+      setDetections((prev) => prev.filter((d) => !allIds.has(d.id)));
     } finally {
-      setDismissing(null);
+      setDismissingGroup(null);
     }
   }
 
@@ -184,6 +231,8 @@ export default function DetectionsPage() {
       </div>
     );
   }
+
+  const groups = groupDetections(detections);
 
   return (
     <div className="p-8">
@@ -198,9 +247,9 @@ export default function DetectionsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {detections.length > 0 && (
+          {groups.length > 0 && (
             <Badge className="text-sm px-3 py-1 bg-primary text-primary-foreground">
-              {detections.length} pending
+              {groups.length} pending
             </Badge>
           )}
           <Button
@@ -251,7 +300,7 @@ export default function DetectionsPage() {
         <div className="mb-4 rounded-md bg-destructive/10 text-destructive text-sm p-3">{scanError}</div>
       )}
 
-      {detections.length === 0 ? (
+      {groups.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center py-16 text-center">
             <Radar size={48} className="text-muted-foreground mb-4" />
@@ -263,69 +312,109 @@ export default function DetectionsPage() {
         </Card>
       ) : (
         <div className="flex flex-col gap-4">
-          {detections.map((d) => (
-            <Card key={d.id}>
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    {/* Header: name + badges */}
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <span className="font-semibold text-base">{d.detected_name || '(unnamed)'}</span>
-                      <Badge className="border-0 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs">
-                        {OCCASION_LABELS[d.occasion_type] ?? d.occasion_type}
-                      </Badge>
-                      <Badge className={cn('border-0 text-xs', CONFIDENCE_STYLES[d.confidence] ?? CONFIDENCE_STYLES.medium)}>
-                        {d.confidence} confidence
-                      </Badge>
+          {groups.map((group) => {
+            const d = group.primary;
+            const isMulti = group.members.length > 1;
+            const isExpanded = expandedGroups.has(group.key);
+            const isDismissing = dismissingGroup === group.key;
+
+            return (
+              <Card key={group.key} className={cn(isMulti && 'border-primary/40')}>
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      {/* Header: name + badges */}
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <span className="font-semibold text-base">{d.detected_name || '(unnamed)'}</span>
+                        <Badge className="border-0 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs">
+                          {OCCASION_LABELS[d.occasion_type] ?? d.occasion_type}
+                        </Badge>
+                        <Badge className={cn('border-0 text-xs', CONFIDENCE_STYLES[d.confidence] ?? CONFIDENCE_STYLES.medium)}>
+                          {d.confidence} confidence
+                        </Badge>
+                        {isMulti && (
+                          <Badge className="border-0 bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 text-xs">
+                            {group.members.length} messages
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Primary message preview */}
+                      <p className="text-sm text-muted-foreground italic mb-2 line-clamp-2">
+                        "{d.raw_message.slice(0, 140)}{d.raw_message.length > 140 ? '…' : ''}"
+                      </p>
+
+                      {/* Meta */}
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1.5">
+                          Source: <Badge className="border-0 bg-blue-500 text-white text-xs px-2 py-0.5">{formatChatId(d.source_chat_name, d.source_chat_id)}</Badge>
+                        </span>
+                        {d.detected_month != null && d.detected_day != null && (
+                          <span>
+                            Date: <span className="font-medium text-foreground">
+                              {MONTHS[d.detected_month]} {d.detected_day}{d.detected_year != null ? `, ${d.detected_year}` : ''}
+                            </span>
+                          </span>
+                        )}
+                        {d.matched_contact != null && (
+                          <span>
+                            Match: <span className="font-medium text-foreground">
+                              {d.matched_contact.name}
+                              {d.match_score != null ? ` (${d.match_score}%)` : ''}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Expand/collapse sibling messages */}
+                      {isMulti && (
+                        <button
+                          className="mt-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => toggleExpand(group.key)}
+                        >
+                          {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                          {isExpanded ? 'Hide' : 'Show'} {group.members.length - 1} similar message{group.members.length - 1 !== 1 ? 's' : ''}
+                        </button>
+                      )}
+
+                      {/* Sibling messages */}
+                      {isMulti && isExpanded && (
+                        <div className="mt-3 pl-3 border-l-2 border-border flex flex-col gap-2">
+                          {group.members.filter((m) => m.id !== d.id).map((m) => (
+                            <div key={m.id} className="text-xs text-muted-foreground">
+                              <span className="italic">"{m.raw_message.slice(0, 120)}{m.raw_message.length > 120 ? '…' : ''}"</span>
+                              {m.detected_month != null && m.detected_day != null && (
+                                <span className="ml-2 text-foreground font-medium">
+                                  {MONTHS[m.detected_month]} {m.detected_day}{m.detected_year != null ? `, ${m.detected_year}` : ''}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
-                    {/* Raw message */}
-                    <p className="text-sm text-muted-foreground italic mb-2 line-clamp-2">
-                      "{d.raw_message.slice(0, 140)}{d.raw_message.length > 140 ? '…' : ''}"
-                    </p>
-
-                    {/* Meta info */}
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1.5">
-                        Source: <Badge className="border-0 bg-blue-500 text-white text-xs px-2 py-0.5">{formatChatId(d.source_chat_name, d.source_chat_id)}</Badge>
-                      </span>
-                      {d.detected_month != null && d.detected_day != null && (
-                        <span>
-                          Date: <span className="font-medium text-foreground">
-                            {MONTHS[d.detected_month]} {d.detected_day}{d.detected_year != null ? `, ${d.detected_year}` : ''}
-                          </span>
-                        </span>
-                      )}
-                      {d.matched_contact != null && (
-                        <span>
-                          Match: <span className="font-medium text-foreground">
-                            {d.matched_contact.name}
-                            {d.match_score != null ? ` (${d.match_score}%)` : ''}
-                          </span>
-                        </span>
-                      )}
+                    {/* Actions */}
+                    <div className="flex gap-2 flex-shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive hover:bg-destructive/10"
+                        onClick={() => handleDismissGroup(group)}
+                        disabled={isDismissing}
+                        title={isMulti ? `Dismiss all ${group.members.length} messages` : 'Dismiss'}
+                      >
+                        {isDismissing ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+                      </Button>
+                      <Button size="sm" onClick={() => openConfirm(group)}>
+                        Confirm
+                      </Button>
                     </div>
                   </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2 flex-shrink-0">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-destructive hover:bg-destructive/10"
-                      onClick={() => handleDismiss(d.id)}
-                      disabled={dismissing === d.id}
-                    >
-                      {dismissing === d.id ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
-                    </Button>
-                    <Button size="sm" onClick={() => openConfirm(d)}>
-                      Confirm
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
@@ -338,10 +427,15 @@ export default function DetectionsPage() {
             </DialogHeader>
 
             <div className="space-y-4 py-2">
-              {/* Detected message context */}
+              {/* Primary message context */}
               <p className="text-xs text-muted-foreground italic border-l-2 border-border pl-3">
-                "{confirmState.detection.raw_message.slice(0, 120)}{confirmState.detection.raw_message.length > 120 ? '…' : ''}"
+                "{confirmState.group.primary.raw_message.slice(0, 120)}{confirmState.group.primary.raw_message.length > 120 ? '…' : ''}"
               </p>
+              {confirmState.group.members.length > 1 && (
+                <p className="text-xs text-violet-600 dark:text-violet-400">
+                  {confirmState.group.members.length - 1} similar message{confirmState.group.members.length - 1 !== 1 ? 's' : ''} will be automatically dismissed.
+                </p>
+              )}
 
               {/* Contact selector */}
               <div className="space-y-1.5">
@@ -370,9 +464,7 @@ export default function DetectionsPage() {
                   value={confirmState.occasionType}
                   onValueChange={(v) => setConfirmState((s) => s && { ...s, occasionType: v as OccasionType })}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="birthday">Birthday</SelectItem>
                     <SelectItem value="anniversary">Anniversary</SelectItem>
@@ -406,9 +498,7 @@ export default function DetectionsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {MONTH_NAMES.slice(1).map((m, i) => (
-                        <SelectItem key={i + 1} value={(i + 1).toString()}>
-                          {m}
-                        </SelectItem>
+                        <SelectItem key={i + 1} value={(i + 1).toString()}>{m}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -434,10 +524,10 @@ export default function DetectionsPage() {
               </div>
 
               {/* Source chat note */}
-              {confirmState.detection.source_chat_id.endsWith('@g.us') && (
+              {confirmState.group.primary.source_chat_id.endsWith('@g.us') && (
                 <p className="text-xs text-emerald-600 dark:text-emerald-400">
                   Messages for this occasion will be sent to the group where it was detected
-                  ({formatChatId(confirmState.detection.source_chat_name, confirmState.detection.source_chat_id)}).
+                  ({formatChatId(confirmState.group.primary.source_chat_name, confirmState.group.primary.source_chat_id)}).
                 </p>
               )}
 
@@ -447,9 +537,7 @@ export default function DetectionsPage() {
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setConfirmState(null)}>
-                Cancel
-              </Button>
+              <Button variant="outline" onClick={() => setConfirmState(null)}>Cancel</Button>
               <Button onClick={handleConfirm} disabled={confirmState.saving}>
                 {confirmState.saving && <Loader2 size={14} className="animate-spin mr-1" />}
                 Add Occasion
