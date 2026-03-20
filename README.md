@@ -1,6 +1,46 @@
 # Wishing Bot
 
-A personal web app that sends AI-generated birthday, anniversary, and occasion greetings via WhatsApp. A daily scheduler generates Claude-powered draft messages; you review and approve them in a browser dashboard, then send with one click — or approve/send directly from WhatsApp using bot commands.
+A personal web app that sends AI-generated birthday, anniversary, and occasion greetings via WhatsApp.
+
+---
+
+## Quick Start (no terminal needed)
+
+### Prerequisites
+
+Install **[Docker Desktop](https://docs.docker.com/desktop/)** — it's the only requirement.
+
+- [Download for Mac](https://docs.docker.com/desktop/install/mac-install/)
+- [Download for Windows](https://docs.docker.com/desktop/install/windows-install/)
+- [Download for Linux](https://docs.docker.com/desktop/install/linux-install/)
+
+### Step 1 — Download this app
+
+Click **Code → Download ZIP** on GitHub, then unzip it anywhere you like.
+
+### Step 2 — Run setup
+
+| Platform | Double-click this file |
+|---|---|
+| **Mac / Linux** | `setup.command` |
+| **Windows** | `setup.bat` |
+
+The wizard will guide you through: checking Docker, entering an API key, picking a timezone, and starting the app.
+
+> **macOS note:** If `setup.command` is blocked by Gatekeeper, right-click it and choose **Open**.
+
+### Step 3 — Scan your WhatsApp QR code
+
+Once the app opens, go to **WhatsApp** in the sidebar and scan the QR code with your phone. You only need to do this once — the session is saved.
+
+### Day-to-day use
+
+| Platform | Start app | Stop app |
+|---|---|---|
+| **Mac / Linux** | `start.command` | `stop.command` |
+| **Windows** | `start.bat` | `stop.bat` |
+
+--- A daily scheduler generates Claude-powered draft messages; you review and approve them in a browser dashboard, then send with one click — or approve/send directly from WhatsApp using bot commands.
 
 ## How it works
 

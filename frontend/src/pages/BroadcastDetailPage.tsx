@@ -5,11 +5,10 @@ import {
   generateBroadcastMessage,
   getBroadcast,
   listContacts,
-  listTargets,
   removeBroadcastRecipient,
   sendBroadcast,
 } from '../api/client';
-import type { BroadcastWithRecipients, Contact, WhatsAppTarget } from '../types';
+import type { BroadcastWithRecipients, Contact } from '../types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -42,9 +41,7 @@ export default function BroadcastDetailPage() {
   const [sending, setSending] = useState(false);
   const [showRecipientPicker, setShowRecipientPicker] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [targets, setTargets] = useState<WhatsAppTarget[]>([]);
   const [selectedContactIds, setSelectedContactIds] = useState<Set<number>>(new Set());
-  const [selectedTargetIds, setSelectedTargetIds] = useState<Set<number>>(new Set());
   const [addingRecipients, setAddingRecipients] = useState(false);
   const [error, setError] = useState('');
 
@@ -95,11 +92,9 @@ export default function BroadcastDetailPage() {
   }
 
   async function openRecipientPicker() {
-    const [c, t] = await Promise.all([listContacts(), listTargets()]);
+    const c = await listContacts();
     setContacts(c);
-    setTargets(t);
     setSelectedContactIds(new Set());
-    setSelectedTargetIds(new Set());
     setShowRecipientPicker(true);
   }
 
@@ -108,7 +103,7 @@ export default function BroadcastDetailPage() {
     try {
       await addBroadcastRecipients(Number(id), {
         contact_ids: Array.from(selectedContactIds),
-        target_ids: Array.from(selectedTargetIds),
+        target_ids: [],
       });
       await load();
       setShowRecipientPicker(false);
@@ -296,36 +291,13 @@ export default function BroadcastDetailPage() {
             </div>
           )}
 
-          {targets.length > 0 && (
-            <div>
-              <h4 className="font-medium text-sm mb-2">WhatsApp Targets</h4>
-              <div className="space-y-1 max-h-32 overflow-y-auto">
-                {targets.map((t) => (
-                  <label key={t.id} className="flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-accent text-sm">
-                    <input
-                      type="checkbox"
-                      checked={selectedTargetIds.has(t.id)}
-                      onChange={(e) => {
-                        const s = new Set(selectedTargetIds);
-                        if (e.target.checked) s.add(t.id); else s.delete(t.id);
-                        setSelectedTargetIds(s);
-                      }}
-                    />
-                    <span className="font-medium">{t.name}</span>
-                    <Badge variant="outline" className="text-xs">{t.target_type}</Badge>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowRecipientPicker(false)}>Cancel</Button>
             <Button
               onClick={handleAddRecipients}
-              disabled={addingRecipients || (selectedContactIds.size === 0 && selectedTargetIds.size === 0)}
+              disabled={addingRecipients || selectedContactIds.size === 0}
             >
-              {addingRecipients ? 'Adding...' : `Add ${selectedContactIds.size + selectedTargetIds.size} Recipients`}
+              {addingRecipients ? 'Adding...' : `Add ${selectedContactIds.size} Recipients`}
             </Button>
           </DialogFooter>
         </DialogContent>
