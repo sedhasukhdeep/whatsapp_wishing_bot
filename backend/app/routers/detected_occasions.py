@@ -163,6 +163,15 @@ def dismiss_all_detections(db: Session = Depends(get_db)):
     return {"dismissed": count}
 
 
+@router.delete("/history")
+def delete_all_history(db: Session = Depends(get_db)):
+    """Permanently delete ALL detection records (all statuses)."""
+    count = db.query(DetectedOccasion).delete()
+    db.commit()
+    return {"deleted": count}
+    return {"dismissed": count}
+
+
 # ── Historical scan ───────────────────────────────────────────────────────────
 
 class ScanHistoryRequest(BaseModel):

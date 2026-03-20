@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { confirmDetection, dismissAllDetections, dismissDetection, getDetectionKeywords, getScanStatus, listContacts, listDetections, startScanHistory, updateDetectionKeywords } from '../api/client';
+import { confirmDetection, deleteDetectionHistory, dismissAllDetections, dismissDetection, getDetectionKeywords, getScanStatus, listContacts, listDetections, startScanHistory, updateDetectionKeywords } from '../api/client';
 import type { Contact, DetectedOccasion, DetectionConfirmRequest, DetectionKeywords, OccasionKeyword, OccasionType } from '../types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -99,6 +99,7 @@ export default function DetectionsPage() {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [dismissingGroup, setDismissingGroup] = useState<string | null>(null);
   const [dismissingAll, setDismissingAll] = useState(false);
+  const [deletingHistory, setDeletingHistory] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const [scanStatus, setScanStatus] = useState<{
@@ -243,6 +244,16 @@ export default function DetectionsPage() {
     }
   }
 
+  async function handleDeleteHistory() {
+    setDeletingHistory(true);
+    try {
+      await deleteDetectionHistory();
+      setDetections([]);
+    } finally {
+      setDeletingHistory(false);
+    }
+  }
+
   async function saveKeywords(updated: DetectionKeywords) {
     setKeywordsSaving(true);
     try {
@@ -338,6 +349,15 @@ export default function DetectionsPage() {
               Delete All
             </Button>
           )}
+          <Button
+            variant="outline"
+            className="gap-2 text-destructive hover:bg-destructive/10"
+            onClick={handleDeleteHistory}
+            disabled={deletingHistory}
+          >
+            {deletingHistory ? <Loader2 size={16} className="animate-spin" /> : <X size={16} />}
+            Delete History
+          </Button>
           <Button
             variant="outline"
             className="gap-2"

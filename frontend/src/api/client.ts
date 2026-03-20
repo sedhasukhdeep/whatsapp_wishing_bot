@@ -205,6 +205,9 @@ export const dismissDetection = (id: number) =>
 export const dismissAllDetections = () =>
   api.post<{ dismissed: number }>('/api/detections/dismiss-all').then((r) => r.data);
 
+export const deleteDetectionHistory = () =>
+  api.delete<{ deleted: number }>('/api/detections/history').then((r) => r.data);
+
 export const getScanStatus = () =>
   api.get<{ running: boolean; scanned: number; detected: number; total: number; error: string | null }>(
     '/api/detections/scan-status'
