@@ -151,6 +151,18 @@ def dismiss_detection(detection_id: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+@router.post("/dismiss-all")
+def dismiss_all_detections(db: Session = Depends(get_db)):
+    """Dismiss all pending detections at once."""
+    count = (
+        db.query(DetectedOccasion)
+        .filter(DetectedOccasion.status == "pending")
+        .update({"status": "dismissed"})
+    )
+    db.commit()
+    return {"dismissed": count}
+
+
 # ── Historical scan ───────────────────────────────────────────────────────────
 
 class ScanHistoryRequest(BaseModel):

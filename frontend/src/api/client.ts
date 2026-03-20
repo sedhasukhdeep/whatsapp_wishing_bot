@@ -202,6 +202,9 @@ export const confirmDetection = (id: number, data: DetectionConfirmRequest) =>
 export const dismissDetection = (id: number) =>
   api.post(`/api/detections/${id}/dismiss`);
 
+export const dismissAllDetections = () =>
+  api.post<{ dismissed: number }>('/api/detections/dismiss-all').then((r) => r.data);
+
 export const getScanStatus = () =>
   api.get<{ running: boolean; scanned: number; detected: number; total: number; error: string | null }>(
     '/api/detections/scan-status'
