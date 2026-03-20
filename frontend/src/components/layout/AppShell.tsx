@@ -36,7 +36,10 @@ export default function AppShell() {
   const [pendingDetections, setPendingDetections] = useState(0);
 
   useEffect(() => {
-    getDetectionsCount().then((r) => setPendingDetections(r.count)).catch(() => {});
+    const refresh = () => getDetectionsCount().then((r) => setPendingDetections(r.count)).catch(() => {});
+    refresh();
+    const interval = setInterval(refresh, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
