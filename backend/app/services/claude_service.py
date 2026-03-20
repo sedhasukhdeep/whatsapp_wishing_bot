@@ -258,6 +258,80 @@ async def _call_provider(prompt: str, ai: dict) -> str:
     return await _generate_claude(prompt, ai["anthropic_api_key"], ai["claude_model"])
 
 
+async def call_ai_raw(system_prompt: str, user_message: str, db=None, max_tokens: int = 512) -> str:
+    """
+    Call the configured AI provider with custom system/user prompts.
+    Uses the same provider selection logic as generate_message.
+    Returns the raw text response (no cleaning applied).
+    Raises RuntimeError if no provider is available.
+    """
+    ai = _get_effective_settings(db)
+    provider = ai["ai_provider"]
+
+    async def _claude() -> str:
+        client = anthropic.AsyncAnthropic(api_key=ai["anthropic_api_key"], timeout=60.0)
+        response = await client.messages.create(
+            model=ai["claude_model"],
+            max_tokens=max_tokens,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}],
+        )
+        return next(b.text for b in response.content if b.type == "text")
+
+    async def _openai() -> str:
+        client = AsyncOpenAI(api_key=ai["openai_api_key"])
+        response = await client.chat.completions.create(
+            model=ai["openai_model"],
+            max_tokens=max_tokens,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+        )
+        return response.choices[0].message.content.strip()
+
+    async def _gemini() -> str:
+        import google.generativeai as genai  # type: ignore
+        genai.configure(api_key=ai["gemini_api_key"])
+        gemini_model = genai.GenerativeModel(model_name=ai["gemini_model"], system_instruction=system_prompt)
+        response = await gemini_model.generate_content_async(user_message)
+        return response.text.strip()
+
+    async def _local(model: str) -> str:
+        client = AsyncOpenAI(base_url=ai["local_ai_url"], api_key="not-needed")
+        response = await client.chat.completions.create(
+            model=model,
+            max_tokens=max_tokens,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+            extra_body={"enable_thinking": False, "chat_template_kwargs": {"enable_thinking": False}},
+        )
+        return response.choices[0].message.content.strip()
+
+    if provider == "openai":
+        return await _openai()
+    if provider == "gemini":
+        return await _gemini()
+    if provider == "local":
+        model = await _detect_local_model(ai["local_ai_url"], ai["local_ai_model"])
+        if not model:
+            raise RuntimeError("Local AI configured but no model is available")
+        return await _local(model)
+    if provider == "claude":
+        return await _claude()
+
+    # auto: try local first, fall back to Claude
+    model = await _detect_local_model(ai["local_ai_url"], ai["local_ai_model"])
+    if model:
+        try:
+            return await _local(model)
+        except Exception as e:
+            logger.warning("call_ai_raw: local failed (%s), falling back to Claude", e)
+    return await _claude()
+
+
 async def generate_message(
     contact: Contact, occasion: Occasion, on_date: date, db=None, extra_context: str | None = None
 ) -> tuple[str, str]:

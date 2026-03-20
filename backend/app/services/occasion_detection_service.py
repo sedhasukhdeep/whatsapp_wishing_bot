@@ -2,6 +2,8 @@
 Scans incoming WhatsApp messages for occasion mentions (birthdays, anniversaries, etc.),
 fuzzy-matches detected names against existing contacts, and creates DetectedOccasion
 records for user review.
+
+Uses the app-wide AI provider (configured in Settings) via call_ai_raw.
 """
 
 import json
@@ -10,13 +12,7 @@ import re
 from difflib import SequenceMatcher
 from datetime import datetime, timezone, timedelta
 
-import anthropic
-
-from app.config import settings as env_settings
-
 logger = logging.getLogger(__name__)
-
-DETECTION_MODEL = "claude-3-5-haiku-20241022"
 
 # Keywords that suggest an occasion message — cheap pre-filter before AI call
 _OCCASION_PATTERN = re.compile(
@@ -40,48 +36,42 @@ DETECTION_SYSTEM_PROMPT = (
     "- If the name is unclear or missing, set name to empty string and confidence to 'low'."
 )
 
+# Strip <think>/<thinking> blocks that local reasoning models sometimes emit before JSON
+_THINKING_TAG_RE = re.compile(r"<think(?:ing)?>.*?</think(?:ing)?>\s*", re.DOTALL | re.IGNORECASE)
+
 
 def is_likely_occasion_message(text: str) -> bool:
     """Cheap keyword pre-filter — returns True only if the message may mention an occasion."""
     return bool(_OCCASION_PATTERN.search(text))
 
 
-async def _call_detection_ai(text: str, api_key: str) -> dict | None:
-    """Call Claude Haiku with the detection prompt. Returns parsed dict or None on failure."""
-    client = anthropic.AsyncAnthropic(api_key=api_key, timeout=30.0)
+def _parse_detection_response(raw: str) -> dict | None:
+    """Strip thinking tags and parse JSON from the AI response."""
+    cleaned = _THINKING_TAG_RE.sub("", raw).strip()
+    # Some models wrap JSON in ```json ... ``` fences
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.DOTALL).strip()
     try:
-        response = await client.messages.create(
-            model=DETECTION_MODEL,
-            max_tokens=200,
-            system=DETECTION_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": text}],
-        )
-        raw = next((b.text for b in response.content if b.type == "text"), "")
-        return json.loads(raw.strip())
+        return json.loads(cleaned)
     except json.JSONDecodeError:
-        logger.warning("Occasion detection: failed to parse AI response as JSON")
-        return None
-    except Exception as e:
-        logger.warning("Occasion detection: AI call failed: %s", e)
+        logger.warning("Occasion detection: failed to parse AI response as JSON: %r", cleaned[:200])
         return None
 
 
 async def detect_occasion_from_message(text: str, db) -> dict | None:
     """
-    Run AI detection on a message. Returns a detection dict or None if:
-    - no occasion detected
-    - AI call fails
-    - Anthropic API key not configured
+    Run AI detection on a message using the app-wide configured AI provider.
+    Returns a detection dict or None if no occasion detected / AI unavailable.
     """
-    from app.models.admin_setting import AdminSetting
+    from app.services.claude_service import call_ai_raw
 
-    rows = {r.key: r.value for r in db.query(AdminSetting).all() if r.value}
-    api_key = rows.get("anthropic_api_key") or env_settings.anthropic_api_key
-    if not api_key:
-        logger.warning("Occasion detection: no Anthropic API key configured — skipping")
+    try:
+        raw = await call_ai_raw(DETECTION_SYSTEM_PROMPT, text, db=db, max_tokens=200)
+    except Exception as e:
+        logger.warning("Occasion detection: AI call failed (%s) — skipping", e)
         return None
 
-    result = await _call_detection_ai(text, api_key)
+    result = _parse_detection_response(raw)
     if not result or not result.get("detected"):
         return None
     return result
@@ -127,7 +117,7 @@ def is_duplicate_detection(
     """
     Returns True if this detection is a duplicate:
     - Same message_id already exists (exact duplicate), OR
-    - A confirmed detection for the same contact + occasion_type + month/day exists within 365 days.
+    - A confirmed detection for the same contact + occasion_type + month/day within 365 days.
     """
     from app.models.detected_occasion import DetectedOccasion
 
@@ -164,7 +154,7 @@ async def process_message_for_occasion(chat_id: str, message_id: str, body: str,
     if not is_likely_occasion_message(body):
         return
 
-    # Check message_id deduplification before any AI call
+    # Check message_id deduplication before any AI call
     if db.query(DetectedOccasion).filter(DetectedOccasion.message_id == message_id).first():
         return
 
@@ -189,7 +179,7 @@ async def process_message_for_occasion(chat_id: str, message_id: str, body: str,
     detection = DetectedOccasion(
         message_id=message_id,
         source_chat_id=chat_id,
-        raw_message=body[:2000],  # cap raw message length
+        raw_message=body[:2000],
         detected_name=detected_name,
         occasion_type=occasion_type,
         occasion_label=occasion_label,
