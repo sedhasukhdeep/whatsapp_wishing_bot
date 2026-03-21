@@ -213,9 +213,10 @@ export default function ContactsPage() {
     }
   }
 
-  const filteredGroups = groupTagGroups.filter((g) =>
-    g.name.toLowerCase().includes(groupTagGroupSearch.toLowerCase())
-  );
+  const filteredGroups = groupTagGroups.filter((g) => {
+    const name = g.name.toLowerCase();
+    return groupTagGroupSearch.toLowerCase().split(/\s+/).filter(Boolean).every((token) => name.includes(token));
+  });
 
   const newCount = syncPreview.filter((p) => !p.already_exists).length;
   const checkedCount = [...syncChecked].filter((phone) =>
