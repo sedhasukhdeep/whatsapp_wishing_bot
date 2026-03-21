@@ -68,7 +68,11 @@ router.get('/wa-contacts', async (_req, res) => {
 
     return res.json(final);
   } catch (err) {
-    console.error('[WA] getContacts error:', err);
+    console.error('[WA] getContacts error:', err.message);
+    if (err.message && err.message.includes('detached Frame')) {
+      handleDetachedFrame();
+      return res.status(503).json({ error: 'WhatsApp not connected' });
+    }
     return res.status(500).json({ error: err.message });
   }
 });
