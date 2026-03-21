@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import MessageDraft, Occasion
+from app.models import Contact, MessageDraft, Occasion
 from app.models.admin_setting import AdminSetting
 
 logger = logging.getLogger(__name__)
@@ -78,13 +78,25 @@ def format_upcoming_notification(upcoming: list) -> str:
     return "\n".join(lines)
 
 
-async def send_admin_notification(db: Session, occasions: list, today: date) -> None:
-    """Send today + upcoming summary to admin WhatsApp chat after daily draft generation."""
+async def send_admin_notification(
+    db: Session, occasions: list, today: date, profile_id: int | None = None
+) -> None:
+    """Send today + upcoming summary to the profile's admin WhatsApp chat."""
     from app.services.whatsapp_service import send_whatsapp_message
 
-    admin_chat_id = get_setting(db, "admin_wa_chat_id")
-    enabled = get_setting(db, "admin_notifications_enabled") == "true"
-    if not admin_chat_id or not enabled:
+    # Resolve admin chat from profile (preferred) or legacy AdminSetting
+    admin_chat_id: str | None = None
+    if profile_id is not None:
+        from app.models.profile import Profile
+        p = db.get(Profile, profile_id)
+        if p and p.wa_admin_chat_id and p.notifications_enabled:
+            admin_chat_id = p.wa_admin_chat_id
+    if not admin_chat_id:
+        admin_chat_id = get_setting(db, "admin_wa_chat_id")
+        if not (admin_chat_id and get_setting(db, "admin_notifications_enabled") == "true"):
+            return
+
+    if not admin_chat_id:
         return
 
     # Build (occasion, contact, draft) list for today
@@ -103,21 +115,23 @@ async def send_admin_notification(db: Session, occasions: list, today: date) -> 
     except Exception as e:
         logger.warning("Failed to send today admin notification: %s", e)
 
-    # Upcoming
+    # Upcoming — scoped to profile if provided
     upcoming = []
     for delta in range(1, 8):
         target = today + timedelta(days=delta)
-        upcoming_occasions = (
+        q = (
             db.query(Occasion)
             .options(selectinload(Occasion.contact))
+            .join(Contact)
             .filter(
                 Occasion.month == target.month,
                 Occasion.day == target.day,
                 Occasion.active == True,  # noqa: E712
             )
-            .all()
         )
-        for u_occ in upcoming_occasions:
+        if profile_id is not None:
+            q = q.filter(Contact.profile_id == profile_id)
+        for u_occ in q.all():
             upcoming.append((u_occ, u_occ.contact, delta))
 
     if upcoming:
@@ -128,8 +142,18 @@ async def send_admin_notification(db: Session, occasions: list, today: date) -> 
             logger.warning("Failed to send upcoming admin notification: %s", e)
 
 
-async def handle_command(command: str, args: list[str], db: Session) -> str:
+async def handle_command(command: str, args: list[str], db: Session, profile_id: int | None = None) -> str:
     today = date.today()
+
+    def _occasions_query():
+        q = (
+            db.query(Occasion)
+            .options(selectinload(Occasion.contact))
+            .join(Contact)
+        )
+        if profile_id is not None:
+            q = q.filter(Contact.profile_id == profile_id)
+        return q
 
     if command == "help":
         return (
@@ -146,8 +170,7 @@ async def handle_command(command: str, args: list[str], db: Session) -> str:
 
     if command == "list":
         occasions = (
-            db.query(Occasion)
-            .options(selectinload(Occasion.contact))
+            _occasions_query()
             .filter(
                 Occasion.month == today.month,
                 Occasion.day == today.day,
@@ -170,8 +193,7 @@ async def handle_command(command: str, args: list[str], db: Session) -> str:
         for delta in range(1, 8):
             target = today + timedelta(days=delta)
             occasions = (
-                db.query(Occasion)
-                .options(selectinload(Occasion.contact))
+                _occasions_query()
                 .filter(
                     Occasion.month == target.month,
                     Occasion.day == target.day,

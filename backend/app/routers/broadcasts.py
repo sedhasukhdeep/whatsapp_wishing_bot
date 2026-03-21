@@ -4,9 +4,11 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
+from app.dependencies import get_current_profile
 from app.models import Contact, WhatsAppTarget
 from app.models.broadcast import Broadcast
 from app.models.broadcast_recipient import BroadcastRecipient
+from app.models.profile import Profile
 from app.schemas.broadcast import (
     AddRecipientsRequest,
     BroadcastCreate,
@@ -20,8 +22,8 @@ from app.services.whatsapp_service import send_whatsapp_message
 router = APIRouter(prefix="/api/broadcasts", tags=["broadcasts"])
 
 
-def _load_broadcast(db: Session, broadcast_id: int) -> Broadcast:
-    b = db.query(Broadcast).filter(Broadcast.id == broadcast_id).first()
+def _load_broadcast(db: Session, broadcast_id: int, profile_id: int) -> Broadcast:
+    b = db.query(Broadcast).filter(Broadcast.id == broadcast_id, Broadcast.profile_id == profile_id).first()
     if not b:
         raise HTTPException(status_code=404, detail="Broadcast not found")
     return b
@@ -41,13 +43,20 @@ def _broadcast_with_recipients(b: Broadcast) -> BroadcastWithRecipients:
 
 
 @router.get("", response_model=list[BroadcastOut])
-def list_broadcasts(db: Session = Depends(get_db)):
-    return db.query(Broadcast).order_by(Broadcast.created_at.desc()).all()
+def list_broadcasts(
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    return db.query(Broadcast).filter(Broadcast.profile_id == profile.id).order_by(Broadcast.created_at.desc()).all()
 
 
 @router.post("", response_model=BroadcastOut, status_code=201)
-def create_broadcast(body: BroadcastCreate, db: Session = Depends(get_db)):
-    b = Broadcast(name=body.name, occasion_name=body.occasion_name)
+def create_broadcast(
+    body: BroadcastCreate,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    b = Broadcast(name=body.name, occasion_name=body.occasion_name, profile_id=profile.id)
     db.add(b)
     db.commit()
     db.refresh(b)
@@ -55,14 +64,18 @@ def create_broadcast(body: BroadcastCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/{broadcast_id}", response_model=BroadcastWithRecipients)
-def get_broadcast(broadcast_id: int, db: Session = Depends(get_db)):
+def get_broadcast(
+    broadcast_id: int,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
     b = (
         db.query(Broadcast)
         .options(
             joinedload(Broadcast.recipients).joinedload(BroadcastRecipient.contact),
             joinedload(Broadcast.recipients).joinedload(BroadcastRecipient.target),
         )
-        .filter(Broadcast.id == broadcast_id)
+        .filter(Broadcast.id == broadcast_id, Broadcast.profile_id == profile.id)
         .first()
     )
     if not b:
@@ -71,15 +84,23 @@ def get_broadcast(broadcast_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/{broadcast_id}", status_code=204)
-def delete_broadcast(broadcast_id: int, db: Session = Depends(get_db)):
-    b = _load_broadcast(db, broadcast_id)
+def delete_broadcast(
+    broadcast_id: int,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    b = _load_broadcast(db, broadcast_id, profile.id)
     db.delete(b)
     db.commit()
 
 
 @router.post("/{broadcast_id}/generate", response_model=BroadcastOut)
-async def generate_message_for_broadcast(broadcast_id: int, db: Session = Depends(get_db)):
-    b = _load_broadcast(db, broadcast_id)
+async def generate_message_for_broadcast(
+    broadcast_id: int,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    b = _load_broadcast(db, broadcast_id, profile.id)
     text, _ = await generate_broadcast_message(b.occasion_name, db=db)
     b.message_text = text
     db.commit()
@@ -88,30 +109,33 @@ async def generate_message_for_broadcast(broadcast_id: int, db: Session = Depend
 
 
 @router.post("/{broadcast_id}/recipients", response_model=BroadcastWithRecipients)
-def add_recipients(broadcast_id: int, body: AddRecipientsRequest, db: Session = Depends(get_db)):
+def add_recipients(
+    broadcast_id: int,
+    body: AddRecipientsRequest,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
     b = (
         db.query(Broadcast)
         .options(
             joinedload(Broadcast.recipients).joinedload(BroadcastRecipient.contact),
             joinedload(Broadcast.recipients).joinedload(BroadcastRecipient.target),
         )
-        .filter(Broadcast.id == broadcast_id)
+        .filter(Broadcast.id == broadcast_id, Broadcast.profile_id == profile.id)
         .first()
     )
     if not b:
         raise HTTPException(status_code=404, detail="Broadcast not found")
 
     for cid in body.contact_ids:
-        contact = db.query(Contact).filter(Contact.id == cid).first()
+        contact = db.query(Contact).filter(Contact.id == cid, Contact.profile_id == profile.id).first()
         if contact:
-            r = BroadcastRecipient(broadcast_id=broadcast_id, recipient_type="contact", contact_id=cid)
-            db.add(r)
+            db.add(BroadcastRecipient(broadcast_id=broadcast_id, recipient_type="contact", contact_id=cid))
 
     for tid in body.target_ids:
-        target = db.query(WhatsAppTarget).filter(WhatsAppTarget.id == tid).first()
+        target = db.query(WhatsAppTarget).filter(WhatsAppTarget.id == tid, WhatsAppTarget.profile_id == profile.id).first()
         if target:
-            r = BroadcastRecipient(broadcast_id=broadcast_id, recipient_type="target", target_id=tid)
-            db.add(r)
+            db.add(BroadcastRecipient(broadcast_id=broadcast_id, recipient_type="target", target_id=tid))
 
     db.commit()
     db.expire(b)
@@ -128,10 +152,16 @@ def add_recipients(broadcast_id: int, body: AddRecipientsRequest, db: Session = 
 
 
 @router.delete("/{broadcast_id}/recipients/{recipient_id}", status_code=204)
-def remove_recipient(broadcast_id: int, recipient_id: int, db: Session = Depends(get_db)):
-    r = db.query(BroadcastRecipient).filter(
+def remove_recipient(
+    broadcast_id: int,
+    recipient_id: int,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    r = db.query(BroadcastRecipient).join(Broadcast).filter(
         BroadcastRecipient.id == recipient_id,
         BroadcastRecipient.broadcast_id == broadcast_id,
+        Broadcast.profile_id == profile.id,
     ).first()
     if not r:
         raise HTTPException(status_code=404, detail="Recipient not found")
@@ -140,28 +170,20 @@ def remove_recipient(broadcast_id: int, recipient_id: int, db: Session = Depends
 
 
 async def _do_retry(broadcast_id: int, message_text: str, recipient_ids: list[int]) -> None:
-    """Background task: retry sending for specific failed recipients."""
     from app.database import SessionLocal
     db = SessionLocal()
     try:
         recipients = (
             db.query(BroadcastRecipient)
-            .options(
-                joinedload(BroadcastRecipient.contact),
-                joinedload(BroadcastRecipient.target),
-            )
+            .options(joinedload(BroadcastRecipient.contact), joinedload(BroadcastRecipient.target))
             .filter(BroadcastRecipient.id.in_(recipient_ids))
             .all()
         )
         for r in recipients:
             try:
                 if r.recipient_type == "contact" and r.contact and r.contact.whatsapp_chat_id:
-                    if r.contact.use_alias_in_broadcast and r.contact.alias:
-                        name = r.contact.alias
-                    else:
-                        name = (r.contact.name or "").split()[0]
-                    personalized = message_text.replace("{name}", name)
-                    await send_whatsapp_message(r.contact.whatsapp_chat_id, personalized)
+                    name = r.contact.alias if (r.contact.use_alias_in_broadcast and r.contact.alias) else (r.contact.name or "").split()[0]
+                    await send_whatsapp_message(r.contact.whatsapp_chat_id, message_text.replace("{name}", name))
                 elif r.recipient_type == "target" and r.target:
                     await send_whatsapp_message(r.target.chat_id, message_text)
                 else:
@@ -179,54 +201,43 @@ async def _do_retry(broadcast_id: int, message_text: str, recipient_ids: list[in
 
 
 @router.post("/{broadcast_id}/retry", status_code=202)
-async def retry_failed(broadcast_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    b = _load_broadcast(db, broadcast_id)
+async def retry_failed(
+    broadcast_id: int,
+    background_tasks: BackgroundTasks,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    b = _load_broadcast(db, broadcast_id, profile.id)
     if b.status != "sent":
         raise HTTPException(status_code=400, detail="Broadcast must be in sent state to retry")
-
-    failed = (
-        db.query(BroadcastRecipient)
-        .filter(
-            BroadcastRecipient.broadcast_id == broadcast_id,
-            BroadcastRecipient.error.isnot(None),
-        )
-        .all()
-    )
+    failed = db.query(BroadcastRecipient).filter(
+        BroadcastRecipient.broadcast_id == broadcast_id,
+        BroadcastRecipient.error.isnot(None),
+    ).all()
     if not failed:
         raise HTTPException(status_code=400, detail="No failed recipients to retry")
-
     for r in failed:
         r.error = None
     db.commit()
-
     background_tasks.add_task(_do_retry, broadcast_id, b.message_text, [r.id for r in failed])
     return {"status": "retrying", "count": len(failed)}
 
 
 async def _do_send(broadcast_id: int, message_text: str) -> None:
-    """Background task: send to all recipients and update status."""
-    from app.database import SessionLocal  # local import to avoid circular
+    from app.database import SessionLocal
     db = SessionLocal()
     try:
         recipients = (
             db.query(BroadcastRecipient)
-            .options(
-                joinedload(BroadcastRecipient.contact),
-                joinedload(BroadcastRecipient.target),
-            )
+            .options(joinedload(BroadcastRecipient.contact), joinedload(BroadcastRecipient.target))
             .filter(BroadcastRecipient.broadcast_id == broadcast_id)
             .all()
         )
-
         for r in recipients:
             try:
                 if r.recipient_type == "contact" and r.contact and r.contact.whatsapp_chat_id:
-                    if r.contact.use_alias_in_broadcast and r.contact.alias:
-                        name = r.contact.alias
-                    else:
-                        name = (r.contact.name or "").split()[0]
-                    personalized = message_text.replace("{name}", name)
-                    await send_whatsapp_message(r.contact.whatsapp_chat_id, personalized)
+                    name = r.contact.alias if (r.contact.use_alias_in_broadcast and r.contact.alias) else (r.contact.name or "").split()[0]
+                    await send_whatsapp_message(r.contact.whatsapp_chat_id, message_text.replace("{name}", name))
                 elif r.recipient_type == "target" and r.target:
                     await send_whatsapp_message(r.target.chat_id, message_text)
                 else:
@@ -243,16 +254,19 @@ async def _do_send(broadcast_id: int, message_text: str) -> None:
 
 
 @router.post("/{broadcast_id}/send", status_code=202)
-async def send_broadcast(broadcast_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    b = _load_broadcast(db, broadcast_id)
+async def send_broadcast(
+    broadcast_id: int,
+    background_tasks: BackgroundTasks,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    b = _load_broadcast(db, broadcast_id, profile.id)
     if not b.message_text:
         raise HTTPException(status_code=400, detail="Message text is required before sending")
     if b.status == "sent":
         raise HTTPException(status_code=400, detail="Broadcast already sent")
-
     b.status = "sent"
     b.sent_at = datetime.now(timezone.utc)
     db.commit()
-
     background_tasks.add_task(_do_send, broadcast_id, b.message_text)
     return {"status": "sending"}

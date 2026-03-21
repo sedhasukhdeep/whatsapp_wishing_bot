@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -10,6 +10,7 @@ class Broadcast(Base):
     __tablename__ = "broadcasts"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    profile_id: Mapped[int] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False, default=1)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     occasion_name: Mapped[str] = mapped_column(String(200), nullable=False)
     message_text: Mapped[str | None] = mapped_column(Text, nullable=True)

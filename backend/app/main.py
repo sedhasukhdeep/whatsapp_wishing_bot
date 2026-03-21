@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import admin, broadcasts, calendar_import, contacts, dashboard, detected_occasions, drafts, giphy, occasions, whatsapp_targets
+from app.routers import admin, broadcasts, calendar_import, contacts, dashboard, detected_occasions, drafts, giphy, occasions, profiles, whatsapp_targets
 from app.scheduler import start_scheduler, stop_scheduler
 
 
@@ -22,9 +22,10 @@ app.add_middleware(
     allow_origins=[settings.frontend_origin],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", "X-Profile-ID"],
 )
 
+app.include_router(profiles.router)
 app.include_router(contacts.router)
 app.include_router(occasions.router)
 app.include_router(whatsapp_targets.router)

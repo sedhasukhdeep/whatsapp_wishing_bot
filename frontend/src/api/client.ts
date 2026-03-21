@@ -21,6 +21,7 @@ import type {
   DraftHistoryItem,
   MessageDraft,
   Occasion,
+  Profile,
   WaSyncImportItem,
   WaSyncPreviewItem,
   WhatsAppTarget,
@@ -31,6 +32,22 @@ const api = axios.create({
   // Docker: leave unset — nginx proxies /api/* to backend container
   baseURL: import.meta.env.VITE_API_URL || '',
   timeout: 30000,
+});
+
+// Inject X-Profile-ID header from localStorage on every request
+api.interceptors.request.use((config) => {
+  const stored = localStorage.getItem('wishing_bot_profile');
+  if (stored) {
+    try {
+      const profile = JSON.parse(stored);
+      if (profile?.id) {
+        config.headers['X-Profile-ID'] = String(profile.id);
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return config;
 });
 
 // Normalize error messages from FastAPI validation errors and plain strings
@@ -237,3 +254,19 @@ export const getDetectionKeywords = () =>
 
 export const updateDetectionKeywords = (data: DetectionKeywords) =>
   api.put<DetectionKeywords>('/api/detections/keywords', data).then((r) => r.data);
+
+// Profiles
+export const listProfiles = () =>
+  api.get<Profile[]>('/api/profiles').then((r) => r.data);
+
+export const createProfile = (data: { name: string; pin?: string }) =>
+  api.post<Profile>('/api/profiles', data).then((r) => r.data);
+
+export const verifyProfilePin = (id: number, pin: string) =>
+  api.post<{ ok: boolean }>(`/api/profiles/${id}/verify-pin`, { pin }).then((r) => r.data);
+
+export const updateProfile = (id: number, data: Partial<{ name: string; pin: string | null; wa_admin_chat_id: string | null; wa_admin_chat_name: string | null; notifications_enabled: boolean }>) =>
+  api.put<Profile>(`/api/profiles/${id}`, data).then((r) => r.data);
+
+export const deleteProfile = (id: number) =>
+  api.delete(`/api/profiles/${id}`);

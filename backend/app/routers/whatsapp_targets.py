@@ -1,10 +1,13 @@
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
+from app.dependencies import get_current_profile
 from app.models import WhatsAppTarget
+from app.models.profile import Profile
 from app.schemas.whatsapp_target import (
     BridgeStatus,
     WhatsAppTargetCreate,
@@ -16,22 +19,40 @@ router = APIRouter(prefix="/api/targets", tags=["whatsapp_targets"])
 
 
 @router.get("", response_model=list[WhatsAppTargetOut])
-def list_targets(db: Session = Depends(get_db)):
-    return db.query(WhatsAppTarget).order_by(WhatsAppTarget.name).all()
+def list_targets(
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    return db.query(WhatsAppTarget).filter(WhatsAppTarget.profile_id == profile.id).order_by(WhatsAppTarget.name).all()
 
 
 @router.post("", response_model=WhatsAppTargetOut, status_code=201)
-def create_target(body: WhatsAppTargetCreate, db: Session = Depends(get_db)):
-    target = WhatsAppTarget(**body.model_dump())
+def create_target(
+    body: WhatsAppTargetCreate,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    target = WhatsAppTarget(**body.model_dump(), profile_id=profile.id)
     db.add(target)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A target with that name already exists in this profile")
     db.refresh(target)
     return target
 
 
 @router.put("/{target_id}", response_model=WhatsAppTargetOut)
-def update_target(target_id: int, body: WhatsAppTargetUpdate, db: Session = Depends(get_db)):
-    target = db.query(WhatsAppTarget).filter(WhatsAppTarget.id == target_id).first()
+def update_target(
+    target_id: int,
+    body: WhatsAppTargetUpdate,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    target = db.query(WhatsAppTarget).filter(
+        WhatsAppTarget.id == target_id, WhatsAppTarget.profile_id == profile.id
+    ).first()
     if not target:
         raise HTTPException(status_code=404, detail="Target not found")
     for field, value in body.model_dump().items():
@@ -42,14 +63,21 @@ def update_target(target_id: int, body: WhatsAppTargetUpdate, db: Session = Depe
 
 
 @router.delete("/{target_id}", status_code=204)
-def delete_target(target_id: int, db: Session = Depends(get_db)):
-    target = db.query(WhatsAppTarget).filter(WhatsAppTarget.id == target_id).first()
+def delete_target(
+    target_id: int,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    target = db.query(WhatsAppTarget).filter(
+        WhatsAppTarget.id == target_id, WhatsAppTarget.profile_id == profile.id
+    ).first()
     if not target:
         raise HTTPException(status_code=404, detail="Target not found")
     db.delete(target)
     db.commit()
 
 
+# Bridge status and chats are not profile-scoped (shared WhatsApp connection)
 @router.get("/bridge-status", response_model=BridgeStatus)
 async def bridge_status():
     try:

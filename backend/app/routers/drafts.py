@@ -4,7 +4,9 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import MessageDraft, WhatsAppTarget
+from app.dependencies import get_current_profile
+from app.models import Contact, MessageDraft, WhatsAppTarget
+from app.models.profile import Profile
 from app.schemas.message_draft import (
     DraftApproveRequest,
     DraftHistoryItem,
@@ -19,9 +21,25 @@ from app.services.whatsapp_service import send_whatsapp_gif, send_whatsapp_messa
 router = APIRouter(prefix="/api/drafts", tags=["drafts"])
 
 
+def _draft_or_404(draft_id: int, profile: Profile, db: Session) -> MessageDraft:
+    draft = (
+        db.query(MessageDraft)
+        .join(Contact)
+        .filter(MessageDraft.id == draft_id, Contact.profile_id == profile.id)
+        .first()
+    )
+    if not draft:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    return draft
+
+
 @router.get("", response_model=list[MessageDraftOut])
-def list_drafts(status: str = "", db: Session = Depends(get_db)):
-    q = db.query(MessageDraft)
+def list_drafts(
+    status: str = "",
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    q = db.query(MessageDraft).join(Contact).filter(Contact.profile_id == profile.id)
     if status:
         q = q.filter(MessageDraft.status == status)
     return q.order_by(MessageDraft.occasion_date.desc(), MessageDraft.created_at.desc()).all()
@@ -29,11 +47,15 @@ def list_drafts(status: str = "", db: Session = Depends(get_db)):
 
 # ⚠️ MUST come before /{draft_id} to avoid FastAPI matching "history" as int
 @router.get("/history", response_model=list[DraftHistoryItem])
-def get_history(db: Session = Depends(get_db)):
+def get_history(
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
     drafts = (
         db.query(MessageDraft)
         .options(joinedload(MessageDraft.contact), joinedload(MessageDraft.occasion))
-        .filter(MessageDraft.status == "sent")
+        .join(Contact)
+        .filter(Contact.profile_id == profile.id, MessageDraft.status == "sent")
         .order_by(MessageDraft.sent_at.desc())
         .all()
     )
@@ -41,18 +63,22 @@ def get_history(db: Session = Depends(get_db)):
 
 
 @router.get("/{draft_id}", response_model=MessageDraftOut)
-def get_draft(draft_id: int, db: Session = Depends(get_db)):
-    draft = db.query(MessageDraft).filter(MessageDraft.id == draft_id).first()
-    if not draft:
-        raise HTTPException(status_code=404, detail="Draft not found")
-    return draft
+def get_draft(
+    draft_id: int,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    return _draft_or_404(draft_id, profile, db)
 
 
 @router.patch("/{draft_id}/approve", response_model=MessageDraftOut)
-async def approve_draft(draft_id: int, body: DraftApproveRequest, db: Session = Depends(get_db)):
-    draft = db.query(MessageDraft).filter(MessageDraft.id == draft_id).first()
-    if not draft:
-        raise HTTPException(status_code=404, detail="Draft not found")
+async def approve_draft(
+    draft_id: int,
+    body: DraftApproveRequest,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    draft = _draft_or_404(draft_id, profile, db)
     if draft.status == "sent":
         raise HTTPException(status_code=400, detail="Cannot modify a sent draft")
     draft.edited_text = body.edited_text
@@ -60,7 +86,6 @@ async def approve_draft(draft_id: int, body: DraftApproveRequest, db: Session = 
     db.commit()
     db.refresh(draft)
 
-    # Auto-send if contact has auto_send enabled and a linked WhatsApp chat
     contact = draft.contact
     if contact and contact.auto_send and contact.whatsapp_chat_id:
         final_text = draft.edited_text or draft.generated_text
@@ -75,10 +100,12 @@ async def approve_draft(draft_id: int, body: DraftApproveRequest, db: Session = 
 
 
 @router.patch("/{draft_id}/skip", response_model=MessageDraftOut)
-def skip_draft(draft_id: int, db: Session = Depends(get_db)):
-    draft = db.query(MessageDraft).filter(MessageDraft.id == draft_id).first()
-    if not draft:
-        raise HTTPException(status_code=404, detail="Draft not found")
+def skip_draft(
+    draft_id: int,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    draft = _draft_or_404(draft_id, profile, db)
     if draft.status == "sent":
         raise HTTPException(status_code=400, detail="Cannot modify a sent draft")
     draft.status = "skipped"
@@ -88,10 +115,13 @@ def skip_draft(draft_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{draft_id}/schedule", response_model=MessageDraftOut)
-def schedule_draft(draft_id: int, body: DraftScheduleRequest, db: Session = Depends(get_db)):
-    draft = db.query(MessageDraft).filter(MessageDraft.id == draft_id).first()
-    if not draft:
-        raise HTTPException(status_code=404, detail="Draft not found")
+def schedule_draft(
+    draft_id: int,
+    body: DraftScheduleRequest,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    draft = _draft_or_404(draft_id, profile, db)
     if draft.status == "sent":
         raise HTTPException(status_code=400, detail="Cannot modify a sent draft")
     draft.scheduled_for = body.scheduled_for
@@ -105,12 +135,10 @@ def schedule_draft(draft_id: int, body: DraftScheduleRequest, db: Session = Depe
 async def regenerate_draft(
     draft_id: int,
     body: RegenerateRequest | None = Body(default=None),
+    profile: Profile = Depends(get_current_profile),
     db: Session = Depends(get_db),
 ):
-    draft = db.query(MessageDraft).filter(MessageDraft.id == draft_id).first()
-    if not draft:
-        raise HTTPException(status_code=404, detail="Draft not found")
-
+    draft = _draft_or_404(draft_id, profile, db)
     feedback = body.feedback if body else None
     new_text, prompt = await generate_message(
         draft.contact, draft.occasion, draft.occasion_date, db=db, extra_context=feedback
@@ -125,17 +153,22 @@ async def regenerate_draft(
 
 
 @router.post("/{draft_id}/send", response_model=MessageDraftOut)
-async def send_draft(draft_id: int, body: DraftSendRequest, db: Session = Depends(get_db)):
-    draft = db.query(MessageDraft).filter(MessageDraft.id == draft_id).first()
-    if not draft:
-        raise HTTPException(status_code=404, detail="Draft not found")
+async def send_draft(
+    draft_id: int,
+    body: DraftSendRequest,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    draft = _draft_or_404(draft_id, profile, db)
     if draft.status == "sent":
         raise HTTPException(status_code=400, detail="Already sent")
     if draft.status not in ("approved", "pending", "scheduled"):
         raise HTTPException(status_code=400, detail="Draft must be approved before sending")
 
     if body.target_id is not None:
-        target = db.query(WhatsAppTarget).filter(WhatsAppTarget.id == body.target_id).first()
+        target = db.query(WhatsAppTarget).filter(
+            WhatsAppTarget.id == body.target_id, WhatsAppTarget.profile_id == profile.id
+        ).first()
         if not target:
             raise HTTPException(status_code=404, detail="Target not found")
         chat_id = target.chat_id

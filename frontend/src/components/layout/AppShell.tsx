@@ -10,14 +10,16 @@ import {
   Settings,
   Sun,
   Users,
+  UserCircle,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { useTheme } from './ThemeProvider';
 import OnboardingWizard from '@/components/OnboardingWizard';
 import { getDetectionsCount } from '@/api/client';
+import { useProfile } from '@/context/ProfileContext';
 
 const navLinks = [
   { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
@@ -32,6 +34,8 @@ const navLinks = [
 
 export default function AppShell() {
   const { theme, toggleTheme } = useTheme();
+  const { profile, setProfile } = useProfile();
+  const navigate = useNavigate();
   const [showTour, setShowTour] = useState(false);
   const [pendingDetections, setPendingDetections] = useState(0);
 
@@ -50,11 +54,24 @@ export default function AppShell() {
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm">
             W
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <div className="font-bold text-sm leading-tight">Wishing Bot</div>
             <div className="text-xs text-muted-foreground mt-0.5">Never miss an occasion</div>
           </div>
         </div>
+
+        {/* Profile indicator */}
+        {profile && (
+          <button
+            onClick={() => { setProfile(null); navigate('/profiles', { replace: true }); }}
+            className="flex items-center gap-2 px-4 py-2 border-b border-border hover:bg-accent transition-colors w-full text-left"
+            title="Switch profile"
+          >
+            <UserCircle size={14} className="text-muted-foreground flex-shrink-0" />
+            <span className="text-xs text-muted-foreground truncate flex-1">{profile.name}</span>
+            <span className="text-xs text-muted-foreground/60">switch</span>
+          </button>
+        )}
 
         {/* Navigation */}
         <div className="flex-1 py-2 overflow-y-auto">

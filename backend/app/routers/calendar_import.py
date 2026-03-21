@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies import get_current_profile
 from app.models.contact import Contact
 from app.models.occasion import Occasion
+from app.models.profile import Profile
 from app.schemas.calendar_import import (
     CalendarImportConfirmRequest,
     CalendarImportPreviewItem,
@@ -17,7 +19,11 @@ MAX_ICS_SIZE = 5 * 1024 * 1024  # 5 MB
 
 
 @router.post("/preview", response_model=list[CalendarImportPreviewItem])
-async def preview_ics(file: UploadFile, db: Session = Depends(get_db)):
+async def preview_ics(
+    file: UploadFile,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
     """Upload a .ics file and preview what would be imported."""
     if not file.filename or not file.filename.lower().endswith(".ics"):
         raise HTTPException(status_code=400, detail="File must be a .ics file")
@@ -31,9 +37,13 @@ async def preview_ics(file: UploadFile, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Failed to parse ICS file: {e}")
 
-    # Flag items whose name matches an existing contact
+    # Flag items whose name matches an existing contact in this profile
     for item in items:
-        existing = db.query(Contact).filter(Contact.name.ilike(item.name)).first()
+        existing = (
+            db.query(Contact)
+            .filter(Contact.name.ilike(item.name), Contact.profile_id == profile.id)
+            .first()
+        )
         if existing:
             item.existing_contact_id = existing.id
             item.existing_contact_name = existing.name
@@ -42,23 +52,35 @@ async def preview_ics(file: UploadFile, db: Session = Depends(get_db)):
 
 
 @router.post("/confirm", response_model=CalendarImportResult)
-def confirm_import(body: CalendarImportConfirmRequest, db: Session = Depends(get_db)):
+def confirm_import(
+    body: CalendarImportConfirmRequest,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
     """Create contacts and occasions from the confirmed import list."""
     contacts_created = 0
     occasions_created = 0
 
     for item in body.items:
         if item.existing_contact_id:
-            contact_id = item.existing_contact_id
+            # Verify the contact belongs to this profile
+            contact = db.query(Contact).filter(
+                Contact.id == item.existing_contact_id, Contact.profile_id == profile.id
+            ).first()
+            contact_id = contact.id if contact else None
         else:
-            contact = Contact(
+            contact_id = None
+
+        if contact_id is None:
+            new_contact = Contact(
                 name=item.name,
                 phone=item.phone,
                 relationship=item.relationship,
+                profile_id=profile.id,
             )
-            db.add(contact)
+            db.add(new_contact)
             db.flush()
-            contact_id = contact.id
+            contact_id = new_contact.id
             contacts_created += 1
 
         # Skip if this exact occasion already exists for this contact

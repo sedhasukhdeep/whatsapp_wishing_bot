@@ -8,14 +8,18 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.config import settings
 from app.database import SessionLocal
-from app.models import MessageDraft, Occasion
+from app.models import Contact, MessageDraft, Occasion
 
 logger = logging.getLogger(__name__)
 scheduler = BackgroundScheduler()
 
 
-async def daily_occasion_check(db: Session | None = None) -> int:
-    """Generate pending drafts for today's occasions. Returns count of new drafts created."""
+async def daily_occasion_check(db: Session | None = None, profile_id: int | None = None) -> int:
+    """Generate pending drafts for today's occasions. Returns count of new drafts created.
+
+    If profile_id is given, only process occasions for contacts in that profile.
+    Otherwise, process all profiles (used by the scheduled job).
+    """
     from app.services.claude_service import generate_message
 
     own_session = db is None
@@ -24,16 +28,19 @@ async def daily_occasion_check(db: Session | None = None) -> int:
 
     try:
         today = date.today()
-        occasions = (
+        q = (
             db.query(Occasion)
             .options(selectinload(Occasion.contact))
+            .join(Contact)
             .filter(
                 Occasion.month == today.month,
                 Occasion.day == today.day,
                 Occasion.active == True,  # noqa: E712
             )
-            .all()
         )
+        if profile_id is not None:
+            q = q.filter(Contact.profile_id == profile_id)
+        occasions = q.all()
 
         created = 0
         for occ in occasions:
@@ -68,12 +75,20 @@ async def daily_occasion_check(db: Session | None = None) -> int:
                 created += 1
 
         db.commit()
-        logger.info("daily_occasion_check: %d drafts created for %s", created, today)
+        logger.info("daily_occasion_check: %d drafts created for %s (profile=%s)", created, today, profile_id)
 
-        # Send admin notification (best-effort)
+        # Send per-profile admin notifications (best-effort)
         try:
             from app.services.admin_wa_service import send_admin_notification
-            await send_admin_notification(db, occasions, today)
+            if profile_id is not None:
+                await send_admin_notification(db, occasions, today, profile_id=profile_id)
+            else:
+                # Send notifications for every profile that has occasions today
+                from app.models.profile import Profile
+                profiles = db.query(Profile).filter(Profile.wa_admin_chat_id.isnot(None)).all()
+                for p in profiles:
+                    profile_occasions = [o for o in occasions if o.contact and o.contact.profile_id == p.id]
+                    await send_admin_notification(db, profile_occasions, today, profile_id=p.id)
         except Exception:
             logger.exception("Failed to send admin WA notification")
 

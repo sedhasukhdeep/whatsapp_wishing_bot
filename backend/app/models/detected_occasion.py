@@ -11,6 +11,9 @@ class DetectedOccasion(Base):
     __table_args__ = (Index("ix_detected_occasions_status_created", "status", "created_at"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    profile_id: Mapped[int | None] = mapped_column(
+        ForeignKey("profiles.id", ondelete="SET NULL"), nullable=True
+    )
     message_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     source_chat_id: Mapped[str] = mapped_column(String(100), nullable=False)
     source_chat_name: Mapped[str | None] = mapped_column(String(100), nullable=True)

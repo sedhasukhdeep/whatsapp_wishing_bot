@@ -294,6 +294,17 @@ export interface DetectionKeywords {
   occasion_keywords: OccasionKeyword[];
 }
 
+// Profiles
+export interface Profile {
+  id: number;
+  name: string;
+  has_pin: boolean;
+  wa_admin_chat_id: string | null;
+  wa_admin_chat_name: string | null;
+  notifications_enabled: boolean;
+  created_at: string;
+}
+
 // WhatsApp Contact Sync
 export interface WaSyncPreviewItem {
   phone: string;

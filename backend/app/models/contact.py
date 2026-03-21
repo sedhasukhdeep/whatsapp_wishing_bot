@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.orm import relationship as sa_relationship
 
@@ -9,10 +9,12 @@ from app.database import Base
 
 class Contact(Base):
     __tablename__ = "contacts"
+    __table_args__ = (UniqueConstraint("profile_id", "phone", name="uq_contacts_profile_phone"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    profile_id: Mapped[int] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False, default=1)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    phone: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    phone: Mapped[str] = mapped_column(String(50), nullable=False)
     relationship: Mapped[str] = mapped_column(String(50), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     tone_preference: Mapped[str] = mapped_column(String(20), nullable=False, default="warm")

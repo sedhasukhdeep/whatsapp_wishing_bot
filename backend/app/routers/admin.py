@@ -108,11 +108,12 @@ async def ai_status(db: Session = Depends(get_db)):
 
 @router.post("/wa-webhook")
 async def wa_webhook(body: WAWebhookPayload, db: Session = Depends(get_db)):
-    from app.services.admin_wa_service import handle_command, get_setting, parse_command
-    from app.services.whatsapp_service import send_whatsapp_message
+    from app.models.profile import Profile
+    from app.services.admin_wa_service import handle_command, parse_command
     from app.services.occasion_detection_service import process_message_for_occasion
+    from app.services.whatsapp_service import send_whatsapp_message
 
-    # Run occasion detection on ALL incoming messages (non-blocking, silent fail)
+    # Run occasion detection — profile_id derived from the matched contact's profile
     try:
         await process_message_for_occasion(
             body.chat_id, body.message_id, body.body, db,
@@ -124,11 +125,13 @@ async def wa_webhook(body: WAWebhookPayload, db: Session = Depends(get_db)):
     except Exception:
         logger.exception("Occasion detection failed for message %s", body.message_id)
 
-    admin_chat_id = get_setting(db, "admin_wa_chat_id")
-    enabled = get_setting(db, "admin_notifications_enabled") == "true"
-
-    # Ignore messages not from admin or if disabled
-    if not admin_chat_id or not enabled or body.chat_id != admin_chat_id:
+    # Route admin commands to whichever profile has this chat as its admin chat
+    profile = (
+        db.query(Profile)
+        .filter(Profile.wa_admin_chat_id == body.chat_id, Profile.notifications_enabled.is_(True))
+        .first()
+    )
+    if not profile:
         return {"ok": True}
 
     command, args = parse_command(body.body)
@@ -136,13 +139,13 @@ async def wa_webhook(body: WAWebhookPayload, db: Session = Depends(get_db)):
         return {"ok": True}
 
     try:
-        reply = await handle_command(command, args, db)
+        reply = await handle_command(command, args, db, profile_id=profile.id)
     except Exception:
         logger.exception("Error handling WA command '%s'", command)
         reply = "An error occurred. Please try again."
 
     try:
-        await send_whatsapp_message(admin_chat_id, reply)
+        await send_whatsapp_message(body.chat_id, reply)
     except Exception as e:
         logger.warning("Failed to send reply to admin: %s", e)
 

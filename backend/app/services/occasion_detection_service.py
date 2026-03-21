@@ -385,6 +385,7 @@ async def process_message_for_occasion(
     chat_name: str | None = None,
     sender_jid: str | None = None,
     sender_name: str | None = None,
+    profile_id: int | None = None,
 ) -> None:
     """
     Full detection pipeline: pre-filter → dedupe → load contacts → resolve/detect → persist.
@@ -396,6 +397,7 @@ async def process_message_for_occasion(
     sender_jid:  JID of the message sender (non-null for group messages)
     sender_name: WhatsApp push name of the sender
     timestamp:   Unix epoch seconds (used to infer occasion date when AI can't extract one)
+    profile_id:  profile to scope contact loading and detection creation
     """
     from app.models.contact import Contact
     from app.models.detected_occasion import DetectedOccasion
@@ -409,6 +411,7 @@ async def process_message_for_occasion(
             chat_id, message_id, body, db,
             timestamp=timestamp, chat_name=chat_name,
             sender_jid=sender_jid, sender_name=sender_name,
+            profile_id=profile_id,
         )
     finally:
         _in_progress_ids.discard(message_id)
@@ -423,6 +426,7 @@ async def _process_message_inner(
     chat_name: str | None = None,
     sender_jid: str | None = None,
     sender_name: str | None = None,
+    profile_id: int | None = None,
 ) -> None:
     from app.models.contact import Contact
     from app.models.detected_occasion import DetectedOccasion
@@ -451,8 +455,11 @@ async def _process_message_inner(
     if db.query(DetectedOccasion).filter(DetectedOccasion.message_id == message_id).first():
         return
 
-    # Load contacts so the AI can match against them
-    contacts = db.query(Contact).all()
+    # Load contacts scoped to profile if provided
+    contacts_q = db.query(Contact)
+    if profile_id is not None:
+        contacts_q = contacts_q.filter(Contact.profile_id == profile_id)
+    contacts = contacts_q.all()
 
     # Resolve sender display name: contact name > WA push name > phone from JID
     resolved_sender = sender_name
@@ -540,6 +547,11 @@ async def _process_message_inner(
     if is_duplicate_detection(message_id, matched_contact_id, occasion_type, detected_month, detected_day, db):
         return
 
+    # If profile_id not supplied, derive it from matched contact
+    effective_profile_id = profile_id
+    if effective_profile_id is None and matched_contact is not None:
+        effective_profile_id = getattr(matched_contact, "profile_id", None)
+
     detection = DetectedOccasion(
         message_id=message_id,
         source_chat_id=chat_id,
@@ -556,6 +568,7 @@ async def _process_message_inner(
         confidence=confidence,
         matched_contact_id=matched_contact_id,
         match_score=None,
+        profile_id=effective_profile_id,
         status="pending",
     )
     db.add(detection)
@@ -570,7 +583,8 @@ async def _process_message_inner(
 
 
 async def scan_group_chat_for_occasions(
-    chat_id: str, messages: list, db, chat_name: str | None = None
+    chat_id: str, messages: list, db, chat_name: str | None = None,
+    profile_id: int | None = None,
 ) -> int:
     """
     Process historical group chat messages as daily context windows.
@@ -593,7 +607,10 @@ async def scan_group_chat_for_occasions(
     # Apply ignore keywords
     ignore_keywords, occasion_keywords = _load_detection_settings(db)
 
-    contacts = db.query(Contact).all()
+    contacts_q = db.query(Contact)
+    if profile_id is not None:
+        contacts_q = contacts_q.filter(Contact.profile_id == profile_id)
+    contacts = contacts_q.all()
 
     # Group messages by UTC date
     days: dict[str, list] = defaultdict(list)
@@ -656,6 +673,10 @@ async def scan_group_chat_for_occasions(
 
         matched_contact = next((c for c in contacts if c.id == matched_contact_id), None)
 
+        effective_profile_id = profile_id
+        if effective_profile_id is None and matched_contact is not None:
+            effective_profile_id = getattr(matched_contact, "profile_id", None)
+
         detection = DetectedOccasion(
             message_id=synthetic_id,
             source_chat_id=chat_id,
@@ -670,6 +691,7 @@ async def scan_group_chat_for_occasions(
             confidence=confidence,
             matched_contact_id=matched_contact_id,
             match_score=None,
+            profile_id=effective_profile_id,
             status="pending",
         )
         db.add(detection)
