@@ -24,7 +24,7 @@ router.get('/group-members/:chatId', async (req, res) => {
     }));
     return res.json({ group_name: chat.name, participants });
   } catch (err) {
-    console.error(`[WA] group-members error for ${chatId}:`, err.message);
+    console.error('[WA] group-members error for chatId:', chatId, err.message);
     if (err.message && err.message.includes('detached Frame')) {
       handleDetachedFrame();
       return res.status(503).json({ error: 'WhatsApp not connected' });

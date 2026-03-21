@@ -236,7 +236,7 @@ async def _call_provider(prompt: str, ai: dict) -> str:
                 "Local AI provider configured but no local model is available. "
                 "Start LM Studio or Ollama and load a model."
             )
-        logger.info("Using local AI model: %s", model)
+        logger.info("Using local AI provider")
         return await _generate_local(prompt, model, ai["local_ai_url"])
 
     if provider == "claude":
@@ -246,7 +246,7 @@ async def _call_provider(prompt: str, ai: dict) -> str:
     model = await _detect_local_model(ai["local_ai_url"], ai["local_ai_model"])
     if model:
         try:
-            logger.info("Auto: using local AI model: %s", model)
+            logger.info("Auto: using local AI provider")
             return await _generate_local(prompt, model, ai["local_ai_url"])
         except Exception as e:
             logger.warning("Local AI failed (%s), falling back to Claude", e)

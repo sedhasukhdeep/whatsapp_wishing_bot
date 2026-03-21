@@ -567,6 +567,7 @@ def write_env(provider, api_key, timezone):
 
     content = _set_var(content, "SCHEDULER_TIMEZONE", timezone)
     env_path.write_text(content)
+    os.chmod(env_path, 0o600)  # owner read/write only — file contains API keys
 
 
 def _set_var(content, key, value):

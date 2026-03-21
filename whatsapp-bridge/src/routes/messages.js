@@ -37,7 +37,7 @@ router.get('/messages/:chatId', async (req, res) => {
 
     return res.json({ chat_name: chat.name || null, messages: result });
   } catch (err) {
-    console.error(`[WA] fetchMessages error for ${chatId}:`, err.message);
+    console.error('[WA] fetchMessages error for chatId:', chatId, err.message);
     if (err.message && err.message.includes('detached Frame')) {
       handleDetachedFrame();
       return res.status(503).json({ error: 'WhatsApp not connected' });
