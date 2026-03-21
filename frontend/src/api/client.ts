@@ -139,6 +139,9 @@ export const initBridgeSession = () =>
 export const restartBridgeSession = () =>
   api.post<BridgeStatus>('/api/targets/restart-session').then((r) => r.data);
 
+export const restartBridge = () =>
+  api.post<{ ok: boolean; message: string }>('/api/targets/restart-bridge').then((r) => r.data);
+
 export interface WaChat { id: string; name: string; type: 'individual' | 'group' }
 export const getWaChats = () =>
   api.get<WaChat[]>('/api/targets/chats').then((r) => r.data);

@@ -167,3 +167,15 @@ async def restart_bridge_session(profile_id: int) -> dict:
             return resp.json()
     except httpx.HTTPError as e:
         raise HTTPException(status_code=502, detail=f"WhatsApp bridge error: {e}") from e
+
+
+async def restart_bridge() -> dict:
+    """Tell the bridge process to exit so Docker restarts it."""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(f"{settings.wa_bridge_url}/admin/restart")
+            resp.raise_for_status()
+            return resp.json()
+    except httpx.HTTPError:
+        # Bridge may close the connection before sending a response — that's expected
+        return {"ok": True, "message": "Bridge restarting..."}

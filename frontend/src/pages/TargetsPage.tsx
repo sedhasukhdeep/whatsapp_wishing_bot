@@ -1,21 +1,37 @@
 import { useEffect, useRef, useState } from 'react';
-import { getBridgeStatus, initBridgeSession, restartBridgeSession } from '../api/client';
+import { getBridgeStatus, initBridgeSession, restartBridge, restartBridgeSession } from '../api/client';
 import type { BridgeStatus } from '../types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { CheckCircle2, Loader2, Link, RefreshCw, WifiOff, RotateCcw } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { CheckCircle2, Loader2, Link, RefreshCw, WifiOff, RotateCcw, Power } from 'lucide-react';
 
 export default function TargetsPage() {
   const [status, setStatus] = useState<BridgeStatus | null>(null);
   const [pollError, setPollError] = useState(false);
   const [initing, setIniting] = useState(false);
+  const [restarting, setRestarting] = useState(false);
   const [startingElapsed, setStartingElapsed] = useState(0);
   const pollErrorCount = useRef(0);
   const startingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   async function load() {
-    const s = await getBridgeStatus();
-    setStatus(s);
+    try {
+      const s = await getBridgeStatus();
+      setStatus(s);
+    } catch {
+      setStatus({ ready: false, qr_image: null, state: 'error' });
+    }
   }
 
   async function handleConnect() {
@@ -31,10 +47,34 @@ export default function TargetsPage() {
     }
   }
 
+  async function handleRestartBridge() {
+    setRestarting(true);
+    setStatus(null);
+    try {
+      await restartBridge();
+    } catch {
+      // bridge closes connection before responding — expected
+    }
+    // Poll until bridge is back up (up to ~30s)
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      try {
+        const s = await getBridgeStatus();
+        setStatus(s);
+        setRestarting(false);
+        return;
+      } catch {
+        // still down, keep waiting
+      }
+    }
+    setRestarting(false);
+    load();
+  }
+
   useEffect(() => { load(); }, []);
 
   useEffect(() => {
-    if (status?.ready) return;
+    if (status?.ready || restarting) return;
     const id = setInterval(async () => {
       try {
         const s = await getBridgeStatus();
@@ -47,7 +87,7 @@ export default function TargetsPage() {
       }
     }, 4000);
     return () => clearInterval(id);
-  }, [status?.ready]);
+  }, [status?.ready, restarting]);
 
   // Track time spent in 'starting' state so we can offer a retry if stuck
   useEffect(() => {
@@ -92,24 +132,32 @@ export default function TargetsPage() {
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-6">WhatsApp</h1>
 
-      <Card className="mb-6">
+      <Card className="mb-4">
         <CardContent className="pt-4">
-          {pollError && (
+          {restarting && (
+            <div className="mb-3 text-sm text-muted-foreground bg-muted rounded px-3 py-2 flex items-center gap-2">
+              <Loader2 size={14} className="animate-spin" />
+              Bridge is restarting — waiting for it to come back online...
+            </div>
+          )}
+          {pollError && !restarting && (
             <div className="mb-3 text-sm text-destructive bg-destructive/10 rounded px-3 py-2">
-              Bridge is not responding. Try restarting the app.
+              Bridge is not responding. Try restarting the bridge below.
             </div>
           )}
           <div className="flex items-center gap-3 mb-3">
-            {status?.ready
-              ? <CheckCircle2 size={18} className="text-emerald-500" />
-              : status?.state === 'starting' && !isStartingStuck
-                ? <Loader2 size={18} className="text-muted-foreground animate-spin" />
-                : <WifiOff size={18} className="text-amber-500" />}
+            {restarting
+              ? <Loader2 size={18} className="text-muted-foreground animate-spin" />
+              : status?.ready
+                ? <CheckCircle2 size={18} className="text-emerald-500" />
+                : status?.state === 'starting' && !isStartingStuck
+                  ? <Loader2 size={18} className="text-muted-foreground animate-spin" />
+                  : <WifiOff size={18} className="text-amber-500" />}
             <span className="font-semibold">
-              WhatsApp: {statusText()}
+              WhatsApp: {restarting ? 'Restarting bridge...' : statusText()}
             </span>
             <div className="ml-auto flex gap-2">
-              {(canConnect || isStartingStuck) && !status?.qr_image && (
+              {!restarting && (canConnect || isStartingStuck) && !status?.qr_image && (
                 <Button variant="default" size="sm" onClick={handleConnect} disabled={initing} className="gap-1">
                   {initing
                     ? <Loader2 size={12} className="animate-spin" />
@@ -119,19 +167,21 @@ export default function TargetsPage() {
                   {isStartingStuck ? 'Retry' : 'Connect WhatsApp'}
                 </Button>
               )}
-              <Button variant="outline" size="sm" onClick={load} className="gap-1">
-                <RefreshCw size={12} />
-                Refresh
-              </Button>
+              {!restarting && (
+                <Button variant="outline" size="sm" onClick={load} className="gap-1">
+                  <RefreshCw size={12} />
+                  Refresh
+                </Button>
+              )}
             </div>
           </div>
-          {status?.state === 'starting' && !isStartingStuck && (
+          {!restarting && status?.state === 'starting' && !isStartingStuck && (
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <Loader2 size={10} className="animate-spin" />
               Launching WhatsApp session — QR code will appear here shortly...
             </p>
           )}
-          {status?.qr_image && (
+          {!restarting && status?.qr_image && (
             <div>
               <p className="text-sm text-muted-foreground mb-3">
                 Open WhatsApp → Settings → Linked Devices → Link a Device → scan below
@@ -143,7 +193,7 @@ export default function TargetsPage() {
               </p>
             </div>
           )}
-          {status?.state === 'qr' && !status?.qr_image && (
+          {!restarting && status?.state === 'qr' && !status?.qr_image && (
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <Loader2 size={10} className="animate-spin" />
               Loading QR code...
@@ -151,6 +201,33 @@ export default function TargetsPage() {
           )}
         </CardContent>
       </Card>
+
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          Having connection issues? Restart the bridge to reset all WhatsApp sessions.
+        </p>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="outline" size="sm" disabled={restarting} className="gap-1.5 text-destructive hover:text-destructive">
+              <Power size={13} />
+              Restart Bridge
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Restart WhatsApp Bridge?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will disconnect all active WhatsApp sessions and restart the bridge process.
+                All profiles will need to reconnect after the bridge comes back online (usually within 10 seconds).
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleRestartBridge}>Restart</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </div>
   );
 }

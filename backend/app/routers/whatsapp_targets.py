@@ -12,7 +12,7 @@ from app.schemas.whatsapp_target import (
     WhatsAppTargetOut,
     WhatsAppTargetUpdate,
 )
-from app.services.whatsapp_service import get_bridge_status, get_wa_chats, init_bridge_session, restart_bridge_session
+from app.services.whatsapp_service import get_bridge_status, get_wa_chats, init_bridge_session, restart_bridge_session, restart_bridge
 
 router = APIRouter(prefix="/api/targets", tags=["whatsapp_targets"])
 
@@ -97,3 +97,9 @@ async def list_wa_chats(profile: Profile = Depends(get_current_profile)):
 async def restart_session(profile: Profile = Depends(get_current_profile)):
     """Force-destroy and reinitialize the WhatsApp session (for recovery from stuck 'starting' state)."""
     return await restart_bridge_session(profile.id)
+
+
+@router.post("/restart-bridge")
+async def restart_bridge_endpoint(_profile: Profile = Depends(get_current_profile)):
+    """Restart the WhatsApp bridge process (Docker will auto-restart it)."""
+    return await restart_bridge()
