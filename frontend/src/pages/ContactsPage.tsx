@@ -301,7 +301,12 @@ export default function ContactsPage() {
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
           {contacts.map((c) => (
-            <Card key={c.id} data-testid="contact-card" className="hover:shadow-sm transition-shadow">
+            <Card key={c.id} data-testid="contact-card" className="relative hover:shadow-sm transition-shadow">
+              {c.occasions_count > 0 && (
+                <span className="absolute top-2.5 right-3 text-xs font-semibold bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 leading-none">
+                  {c.occasions_count}
+                </span>
+              )}
               <CardContent className="pt-4 pb-4">
                 <div className="font-semibold text-base">{c.name}</div>
                 <div className="text-sm text-muted-foreground mt-1 mb-2 flex items-center gap-2">

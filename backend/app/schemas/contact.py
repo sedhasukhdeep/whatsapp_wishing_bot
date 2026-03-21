@@ -65,6 +65,7 @@ class ContactOut(ContactBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    occasions_count: int = 0
 
 
 class ContactWithOccasions(ContactOut):

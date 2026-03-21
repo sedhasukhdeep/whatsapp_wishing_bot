@@ -89,7 +89,7 @@ async def approve_draft(
     contact = draft.contact
     if contact and contact.auto_send and contact.whatsapp_chat_id:
         final_text = draft.edited_text or draft.generated_text
-        await send_whatsapp_message(contact.whatsapp_chat_id, final_text)
+        await send_whatsapp_message(contact.whatsapp_chat_id, final_text, profile_id=profile.id)
         draft.final_text = final_text
         draft.status = "sent"
         draft.sent_at = datetime.now(timezone.utc)
@@ -186,10 +186,10 @@ async def send_draft(
     final_text = draft.edited_text or draft.generated_text
 
     if body.gif_url:
-        await send_whatsapp_gif(chat_id, body.gif_url, final_text)
+        await send_whatsapp_gif(chat_id, body.gif_url, final_text, profile_id=profile.id)
         draft.gif_url = body.gif_url
     else:
-        await send_whatsapp_message(chat_id, final_text)
+        await send_whatsapp_message(chat_id, final_text, profile_id=profile.id)
 
     draft.whatsapp_target_id = target_id
     draft.final_text = final_text

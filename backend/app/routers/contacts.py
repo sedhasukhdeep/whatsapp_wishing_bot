@@ -3,9 +3,12 @@ from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
+from sqlalchemy import func
+
 from app.database import get_db
 from app.dependencies import get_current_profile
 from app.models import Contact
+from app.models.occasion import Occasion
 from app.models.profile import Profile
 from app.schemas.contact import (
     BulkTagRequest,
@@ -29,7 +32,7 @@ async def wa_sync_preview(
     profile: Profile = Depends(get_current_profile),
     db: Session = Depends(get_db),
 ):
-    wa_contacts = await get_wa_contacts()
+    wa_contacts = await get_wa_contacts(profile.id)
     existing = db.query(Contact.phone, Contact.id).filter(Contact.profile_id == profile.id).all()
     existing_phones = {row.phone: row.id for row in existing}
     result = []
@@ -84,7 +87,7 @@ async def group_tag_preview(
     profile: Profile = Depends(get_current_profile),
     db: Session = Depends(get_db),
 ):
-    data = await get_group_members(group_id)
+    data = await get_group_members(group_id, profile_id=profile.id)
     participants = data.get("participants", [])
     contacts = db.query(Contact).filter(Contact.profile_id == profile.id).all()
     phone_to_contact = {c.phone: c for c in contacts}
@@ -137,12 +140,28 @@ def list_contacts(
     profile: Profile = Depends(get_current_profile),
     db: Session = Depends(get_db),
 ):
-    q = db.query(Contact).filter(Contact.profile_id == profile.id)
+    # Subquery: occasion count per contact
+    occ_count = (
+        db.query(Occasion.contact_id, func.count(Occasion.id).label("cnt"))
+        .filter(Occasion.active == True)  # noqa: E712
+        .group_by(Occasion.contact_id)
+        .subquery()
+    )
+    q = (
+        db.query(Contact, func.coalesce(occ_count.c.cnt, 0).label("occasions_count"))
+        .outerjoin(occ_count, Contact.id == occ_count.c.contact_id)
+        .filter(Contact.profile_id == profile.id)
+    )
     if search:
         q = q.filter(or_(Contact.name.ilike(f"%{search}%"), Contact.phone.ilike(f"%{search}%")))
     if relationship:
         q = q.filter(Contact.relationship == relationship)
-    return q.order_by(Contact.name).all()
+    rows = q.order_by(Contact.name).all()
+    result = []
+    for contact, count in rows:
+        contact.occasions_count = count
+        result.append(contact)
+    return result
 
 
 @router.post("", response_model=ContactOut, status_code=201)

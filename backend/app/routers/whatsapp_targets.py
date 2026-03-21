@@ -1,9 +1,7 @@
-import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_profile
 from app.models import WhatsAppTarget
@@ -14,6 +12,7 @@ from app.schemas.whatsapp_target import (
     WhatsAppTargetOut,
     WhatsAppTargetUpdate,
 )
+from app.services.whatsapp_service import get_bridge_status, get_wa_chats, init_bridge_session, restart_bridge_session
 
 router = APIRouter(prefix="/api/targets", tags=["whatsapp_targets"])
 
@@ -77,29 +76,24 @@ def delete_target(
     db.commit()
 
 
-# Bridge status and chats are not profile-scoped (shared WhatsApp connection)
 @router.get("/bridge-status", response_model=BridgeStatus)
-async def bridge_status():
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(f"{settings.wa_bridge_url}/status")
-            resp.raise_for_status()
-            return resp.json()
-    except httpx.HTTPError:
-        return BridgeStatus(ready=False, qr_image=None, state='error')
+async def bridge_status(profile: Profile = Depends(get_current_profile)):
+    return await get_bridge_status(profile.id)
+
+
+@router.post("/init-session", response_model=BridgeStatus)
+async def init_session(profile: Profile = Depends(get_current_profile)):
+    """Tell the bridge to start (or re-init) the WhatsApp session for this profile."""
+    return await init_bridge_session(profile.id)
 
 
 @router.get("/chats")
-async def list_wa_chats():
-    """Return all WhatsApp chats from the connected session for target picker."""
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.get(f"{settings.wa_bridge_url}/chats")
-            if resp.status_code == 503:
-                raise HTTPException(status_code=503, detail="WhatsApp not connected")
-            resp.raise_for_status()
-            return resp.json()
-    except HTTPException:
-        raise
-    except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Bridge error: {e}") from e
+async def list_wa_chats(profile: Profile = Depends(get_current_profile)):
+    """Return all WhatsApp chats for this profile's session."""
+    return await get_wa_chats(profile.id)
+
+
+@router.post("/restart-session", response_model=BridgeStatus)
+async def restart_session(profile: Profile = Depends(get_current_profile)):
+    """Force-destroy and reinitialize the WhatsApp session (for recovery from stuck 'starting' state)."""
+    return await restart_bridge_session(profile.id)

@@ -2,6 +2,8 @@
 
 Send AI-generated birthday, anniversary, and occasion greetings via WhatsApp — automatically. A daily scheduler drafts personalised messages; you review and approve them in a browser dashboard, then send with one click. Or broadcast a single message to many people at once, personalised per recipient.
 
+**Multi-profile support:** one installation can serve multiple independent users. Each profile has its own contacts, occasions, drafts, and WhatsApp account. Profiles can optionally be protected with a PIN.
+
 ---
 
 ## Quick Start (no terminal needed)
@@ -36,9 +38,18 @@ The wizard checks Docker, asks for an AI key, sets your timezone, builds the con
 
 > **macOS:** If blocked by Gatekeeper, right-click the file → **Open** → click Open again.
 
-### Step 4 — Connect WhatsApp
+### Step 4 — Select or create a profile
 
-In the app, go to **WhatsApp** in the sidebar and scan the QR code with your phone. You only need to do this once — the session is saved.
+When the app opens you'll land on the **Profile selection** screen. A default profile is created automatically. You can:
+
+- Click a profile to enter it (optionally enter a PIN if one is set)
+- Click **+ New Profile** to add another user
+
+Each profile is completely independent — its own contacts, occasions, drafts, and WhatsApp connection.
+
+### Step 5 — Connect WhatsApp
+
+In the app, go to **WhatsApp** in the sidebar. If no session exists for this profile, click **Connect WhatsApp** and scan the QR code that appears with your phone. You only need to do this once per profile — the session is saved.
 
 ---
 
@@ -57,6 +68,17 @@ Double-click the same file every time:
 ---
 
 ## Features
+
+### Profiles
+
+Multiple independent users can share one Wishing Bot installation. Each profile has:
+
+- Its own contacts, occasions, drafts, and broadcast history
+- Its own WhatsApp account — scan a different QR code per profile
+- Its own admin chat and notification settings
+- Optional PIN protection
+
+Switch between profiles at any time via the profile name in the top-left corner → **Switch profile**.
 
 ### Occasion drafts
 
@@ -114,6 +136,8 @@ Set a [Giphy API key](https://developers.giphy.com/) to enable the GIF picker on
 ### Admin WhatsApp notifications
 
 Designate a WhatsApp chat (your own number, a group, etc.) to receive a daily summary and upcoming events preview. This is what the bot commands reply to.
+
+This is a **per-profile** setting — configure it under **Settings → Admin WhatsApp Notifications** while the target profile is selected. Each profile sends notifications to its own designated chat via its own WhatsApp connection.
 
 ---
 
@@ -177,8 +201,9 @@ Open **http://localhost**.
 ### Useful commands
 
 ```bash
-# Trigger draft generation now (skip waiting for 8 AM)
-curl -X POST http://localhost:8000/api/dashboard/generate
+# Trigger draft generation now for profile 1 (skip waiting for 8 AM)
+curl -X POST http://localhost:8000/api/dashboard/generate \
+  -H "X-Profile-ID: 1"
 
 # Create a migration after model changes
 cd backend && alembic revision --autogenerate -m "description" && alembic upgrade head
@@ -189,6 +214,14 @@ open http://localhost:8000/docs
 # Run E2E tests (requires app running on localhost:5173)
 cd frontend && npx playwright test
 ```
+
+### Multi-profile notes for developers
+
+Every API request must include an `X-Profile-ID: <id>` header. The frontend axios interceptor injects this automatically from `localStorage`. When testing with `curl` or Postman, add `-H "X-Profile-ID: 1"`.
+
+Profile 1 is created automatically on first run (`alembic upgrade head`). Additional profiles are managed via `POST /api/profiles`.
+
+WhatsApp sessions are stored per-profile under `whatsapp-bridge/session/session-profile_<id>/`. The bridge auto-discovers and starts all sessions on startup. An existing single-user session (`session/session/`) is automatically migrated to `session/session-profile_1/` on first start.
 
 ---
 

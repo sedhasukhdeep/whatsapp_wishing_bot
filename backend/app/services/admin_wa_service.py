@@ -111,7 +111,7 @@ async def send_admin_notification(
 
     today_msg = format_today_notification(items, today)
     try:
-        await send_whatsapp_message(admin_chat_id, today_msg)
+        await send_whatsapp_message(admin_chat_id, today_msg, profile_id=profile_id)
     except Exception as e:
         logger.warning("Failed to send today admin notification: %s", e)
 
@@ -137,7 +137,7 @@ async def send_admin_notification(
     if upcoming:
         upcoming_msg = format_upcoming_notification(upcoming)
         try:
-            await send_whatsapp_message(admin_chat_id, upcoming_msg)
+            await send_whatsapp_message(admin_chat_id, upcoming_msg, profile_id=profile_id)
         except Exception as e:
             logger.warning("Failed to send upcoming admin notification: %s", e)
 
@@ -252,7 +252,7 @@ async def handle_command(command: str, args: list[str], db: Session, profile_id:
 
             final_text = draft.edited_text or draft.generated_text
             try:
-                await send_whatsapp_message(chat_id, final_text)
+                await send_whatsapp_message(chat_id, final_text, profile_id=profile_id)
             except Exception as e:
                 return f"Send failed: {e}"
 

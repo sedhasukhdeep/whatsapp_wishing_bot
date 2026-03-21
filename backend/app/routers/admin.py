@@ -113,7 +113,7 @@ async def wa_webhook(body: WAWebhookPayload, db: Session = Depends(get_db)):
     from app.services.occasion_detection_service import process_message_for_occasion
     from app.services.whatsapp_service import send_whatsapp_message
 
-    # Run occasion detection — profile_id derived from the matched contact's profile
+    # Run occasion detection scoped to the profile that received the message
     try:
         await process_message_for_occasion(
             body.chat_id, body.message_id, body.body, db,
@@ -121,16 +121,26 @@ async def wa_webhook(body: WAWebhookPayload, db: Session = Depends(get_db)):
             chat_name=body.chat_name,
             sender_jid=body.author,
             sender_name=body.sender_name,
+            profile_id=body.profile_id,
         )
     except Exception:
         logger.exception("Occasion detection failed for message %s", body.message_id)
 
-    # Route admin commands to whichever profile has this chat as its admin chat
-    profile = (
-        db.query(Profile)
-        .filter(Profile.wa_admin_chat_id == body.chat_id, Profile.notifications_enabled.is_(True))
-        .first()
-    )
+    # Route admin commands to whichever profile has this chat as its admin chat.
+    # Prefer body.profile_id (bridge-supplied) for direct lookup; fall back to
+    # scanning wa_admin_chat_id in case an older bridge version omits it.
+    profile: Profile | None = None
+    if body.profile_id is not None:
+        profile = db.query(Profile).filter(
+            Profile.id == body.profile_id,
+            Profile.wa_admin_chat_id == body.chat_id,
+            Profile.notifications_enabled.is_(True),
+        ).first()
+    if profile is None:
+        profile = db.query(Profile).filter(
+            Profile.wa_admin_chat_id == body.chat_id,
+            Profile.notifications_enabled.is_(True),
+        ).first()
     if not profile:
         return {"ok": True}
 

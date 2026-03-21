@@ -88,8 +88,17 @@ def delete_profile(
     profile = db.query(Profile).filter(Profile.id == profile_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
-    total = db.query(Profile).count()
-    if total <= 1:
-        raise HTTPException(status_code=400, detail="Cannot delete the last profile")
+    # Cascade-delete all profile data explicitly before removing the profile.
+    # The DB foreign keys have ondelete=CASCADE but SQLite requires PRAGMA
+    # foreign_keys=ON; explicit deletion is a safe belt-and-suspenders approach.
+    from app.models import Contact, WhatsAppTarget
+    from app.models.broadcast import Broadcast
+    from app.models.detected_occasion import DetectedOccasion
+    db.query(DetectedOccasion).filter(DetectedOccasion.profile_id == profile_id).delete()
+    db.query(Broadcast).filter(Broadcast.profile_id == profile_id).delete()
+    db.query(WhatsAppTarget).filter(WhatsAppTarget.profile_id == profile_id).delete()
+    # Deleting contacts cascades to occasions and drafts via ORM relationship
+    for contact in db.query(Contact).filter(Contact.profile_id == profile_id).all():
+        db.delete(contact)
     db.delete(profile)
     db.commit()

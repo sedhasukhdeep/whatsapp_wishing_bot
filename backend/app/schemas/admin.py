@@ -51,6 +51,7 @@ class AIStatusOut(BaseModel):
 
 
 class WAWebhookPayload(BaseModel):
+    profile_id: int | None = None  # Which profile's WhatsApp received this message
     chat_id: str
     body: str
     message_id: str

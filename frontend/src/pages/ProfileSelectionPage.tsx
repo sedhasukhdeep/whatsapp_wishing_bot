@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, User, Lock } from 'lucide-react';
+import { AlertTriangle, Lock, Plus, Trash2, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useProfile } from '@/context/ProfileContext';
-import { listProfiles, createProfile, verifyProfilePin } from '@/api/client';
+import { listProfiles, createProfile, verifyProfilePin, deleteProfile } from '@/api/client';
 import type { Profile } from '@/types';
 
 export default function ProfileSelectionPage() {
@@ -33,6 +33,11 @@ export default function ProfileSelectionPage() {
   const [newPinConfirm, setNewPinConfirm] = useState('');
   const [createError, setCreateError] = useState('');
   const [createLoading, setCreateLoading] = useState(false);
+
+  // Delete confirmation dialog
+  const [deleteTarget, setDeleteTarget] = useState<Profile | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     listProfiles()
@@ -83,6 +88,25 @@ export default function ProfileSelectionPage() {
     }
   };
 
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    setDeleteError('');
+    try {
+      // Temporarily set the profile so the auth header is sent
+      setProfile(deleteTarget);
+      await deleteProfile(deleteTarget.id);
+      setProfile(null);
+      setDeleteTarget(null);
+      setProfiles((prev) => prev.filter((p) => p.id !== deleteTarget.id));
+    } catch (err: unknown) {
+      setProfile(null);
+      setDeleteError((err as Error).message || 'Failed to delete profile.');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
@@ -93,7 +117,9 @@ export default function ProfileSelectionPage() {
           </div>
           <div>
             <div className="font-bold text-lg leading-tight">Wishing Bot</div>
-            <div className="text-xs text-muted-foreground">Select your profile</div>
+            <div className="text-xs text-muted-foreground">
+              {profiles.length === 0 && !loading ? 'Create your profile to get started' : 'Select your profile'}
+            </div>
           </div>
         </div>
 
@@ -101,34 +127,46 @@ export default function ProfileSelectionPage() {
           <div className="text-center text-muted-foreground text-sm">Loading profiles…</div>
         ) : (
           <div className="space-y-2">
+            {profiles.length === 0 && (
+              <div className="text-center py-6 text-muted-foreground text-sm">
+                No profiles yet. Create one to get started.
+              </div>
+            )}
+
             {profiles.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => selectProfile(p)}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-border bg-card hover:bg-accent transition-colors text-left"
-              >
-                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                  <User size={16} className="text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm">{p.name}</div>
-                  {p.has_pin && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Lock size={10} /> PIN protected
-                    </div>
-                  )}
-                </div>
-              </button>
+              <div key={p.id} className="flex items-center gap-2">
+                <button
+                  onClick={() => selectProfile(p)}
+                  className="flex-1 flex items-center gap-3 px-4 py-3 rounded-lg border border-border bg-card hover:bg-accent transition-colors text-left"
+                >
+                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <User size={16} className="text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm">{p.name}</div>
+                    {p.has_pin && (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Lock size={10} /> PIN protected
+                      </div>
+                    )}
+                  </div>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setDeleteTarget(p); setDeleteError(''); }}
+                  className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  title="Delete profile"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
             ))}
 
             <button
               onClick={() => { setShowCreate(true); setNewName(''); setNewPin(''); setNewPinConfirm(''); setCreateError(''); }}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-dashed border-border hover:bg-accent transition-colors text-muted-foreground text-sm"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-border hover:bg-accent transition-colors text-muted-foreground text-sm"
             >
-              <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
-                <Plus size={16} />
-              </div>
-              Add profile
+              <Plus size={14} />
+              {profiles.length === 0 ? 'Create profile' : 'Add profile'}
             </button>
           </div>
         )}
@@ -201,6 +239,50 @@ export default function ProfileSelectionPage() {
             <Button className="w-full" onClick={submitCreate} disabled={createLoading || !newName.trim()}>
               {createLoading ? 'Creating…' : 'Create Profile'}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle size={18} />
+              Delete profile "{deleteTarget?.name}"?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-md bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive space-y-1">
+              <p className="font-medium">This will permanently delete:</p>
+              <ul className="list-disc list-inside space-y-0.5 text-destructive/90">
+                <li>All contacts and their occasions</li>
+                <li>All message drafts and history</li>
+                <li>All broadcasts</li>
+                <li>All detected occasions</li>
+                <li>WhatsApp targets and settings</li>
+              </ul>
+              <p className="font-medium mt-2">This cannot be undone.</p>
+            </div>
+            {deleteError && <p className="text-xs text-destructive">{deleteError}</p>}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleteLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={confirmDelete}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? 'Deleting…' : 'Delete everything'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

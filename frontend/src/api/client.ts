@@ -72,10 +72,10 @@ export const listContacts = (search = '', relationship = '') =>
 export const getContact = (id: number) =>
   api.get<ContactWithOccasions>(`/api/contacts/${id}`).then((r) => r.data);
 
-export const createContact = (data: Omit<Contact, 'id' | 'created_at' | 'updated_at'>) =>
+export const createContact = (data: Omit<Contact, 'id' | 'created_at' | 'updated_at' | 'occasions_count'>) =>
   api.post<Contact>('/api/contacts', data).then((r) => r.data);
 
-export const updateContact = (id: number, data: Omit<Contact, 'id' | 'created_at' | 'updated_at'>) =>
+export const updateContact = (id: number, data: Omit<Contact, 'id' | 'created_at' | 'updated_at' | 'occasions_count'>) =>
   api.put<Contact>(`/api/contacts/${id}`, data).then((r) => r.data);
 
 export const deleteContact = (id: number) => api.delete(`/api/contacts/${id}`);
@@ -132,6 +132,12 @@ export const deleteTarget = (id: number) => api.delete(`/api/targets/${id}`);
 
 export const getBridgeStatus = () =>
   api.get<BridgeStatus>('/api/targets/bridge-status').then((r) => r.data);
+
+export const initBridgeSession = () =>
+  api.post<BridgeStatus>('/api/targets/init-session').then((r) => r.data);
+
+export const restartBridgeSession = () =>
+  api.post<BridgeStatus>('/api/targets/restart-session').then((r) => r.data);
 
 export interface WaChat { id: string; name: string; type: 'individual' | 'group' }
 export const getWaChats = () =>

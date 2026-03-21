@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2, Eye, EyeOff, RefreshCw } from 'lucide-react';
-import { getAISettings, getAIStatus, getWaChats, updateAISettings } from '../api/client';
+import { getAISettings, getAIStatus, getWaChats, updateAISettings, updateProfile } from '../api/client';
 import type { WaChat } from '../api/client';
 import type { AISettings, AIStatus } from '../types';
+import { useProfile } from '../context/ProfileContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -42,6 +43,7 @@ const AI_PROVIDERS = [
 ];
 
 export default function SettingsPage() {
+  const { profile, setProfile } = useProfile();
   const [settings, setSettings] = useState<AISettings | null>(null);
   const [status, setStatus] = useState<AIStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,12 +70,14 @@ export default function SettingsPage() {
   const [giphyKey, setGiphyKey] = useState('');
   const [showGiphyKey, setShowGiphyKey] = useState(false);
 
-  // Admin WA form state
-  const [adminChatId, setAdminChatId] = useState('');
-  const [adminChatName, setAdminChatName] = useState('');
-  const [adminNotificationsEnabled, setAdminNotificationsEnabled] = useState(false);
+  // Admin WA form state — per-profile
+  const [adminChatId, setAdminChatId] = useState(profile?.wa_admin_chat_id ?? '');
+  const [adminChatName, setAdminChatName] = useState(profile?.wa_admin_chat_name ?? '');
+  const [adminNotificationsEnabled, setAdminNotificationsEnabled] = useState(profile?.notifications_enabled ?? true);
   const [waChats, setWaChats] = useState<WaChat[]>([]);
   const [waChatsLoading, setWaChatsLoading] = useState(false);
+  const [adminSaved, setAdminSaved] = useState(false);
+  const [adminSaving, setAdminSaving] = useState(false);
 
   useEffect(() => {
     Promise.all([getAISettings(), getAIStatus()])
@@ -86,9 +90,6 @@ export default function SettingsPage() {
         setGeminiModel(s.gemini_model);
         setLocalAiUrl(s.local_ai_url);
         setLocalAiModel(s.local_ai_model);
-        setAdminChatId(s.admin_wa_chat_id ?? '');
-        setAdminChatName(s.admin_wa_chat_name ?? '');
-        setAdminNotificationsEnabled(s.admin_notifications_enabled);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -134,9 +135,6 @@ export default function SettingsPage() {
         local_ai_url: localAiUrl,
         local_ai_model: localAiModel,
         giphy_api_key: giphyKey !== '' ? giphyKey : null,
-        admin_wa_chat_id: adminChatId !== '' ? adminChatId : null,
-        admin_wa_chat_name: adminChatName !== '' ? adminChatName : null,
-        admin_notifications_enabled: adminNotificationsEnabled,
       });
       setSettings(updated);
       setApiKey('');
@@ -151,6 +149,27 @@ export default function SettingsPage() {
       setError(e.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAdminSave = async () => {
+    if (!profile) return;
+    setAdminSaving(true);
+    setError(null);
+    setAdminSaved(false);
+    try {
+      const updated = await updateProfile(profile.id, {
+        wa_admin_chat_id: adminChatId !== '' ? adminChatId : null,
+        wa_admin_chat_name: adminChatName !== '' ? adminChatName : null,
+        notifications_enabled: adminNotificationsEnabled,
+      });
+      setProfile(updated);
+      setAdminSaved(true);
+      setTimeout(() => setAdminSaved(false), 3000);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setAdminSaving(false);
     }
   };
 
@@ -451,6 +470,9 @@ export default function SettingsPage() {
           <CardTitle className="text-sm font-medium">Admin WhatsApp Notifications</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
+          <p className="text-xs text-muted-foreground">
+            Per-profile setting — saved to the current profile (<strong>{profile?.name}</strong>).
+          </p>
           <Field
             label="Admin WhatsApp Chat"
             description="This chat receives daily summaries and accepts bot commands (approve, send, skip, etc.)."
@@ -493,8 +515,8 @@ export default function SettingsPage() {
               >
                 {waChatsLoading ? 'Loading…' : waChats.length > 0 ? 'Refresh chats' : 'Load chats from WhatsApp'}
               </Button>
-              {settings?.admin_wa_chat_name && adminChatId === settings.admin_wa_chat_id && (
-                <p className="text-xs text-muted-foreground">Currently set to: {settings.admin_wa_chat_name}</p>
+              {profile?.wa_admin_chat_name && (
+                <p className="text-xs text-muted-foreground">Currently set to: {profile.wa_admin_chat_name}</p>
               )}
             </div>
           </Field>
@@ -510,6 +532,18 @@ export default function SettingsPage() {
             </label>
           </div>
 
+          <div className="flex items-center gap-3">
+            <Button onClick={handleAdminSave} disabled={adminSaving}>
+              {adminSaving ? 'Saving…' : 'Save Notification Settings'}
+            </Button>
+            {adminSaved && (
+              <span className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400">
+                <CheckCircle2 size={14} />
+                Saved
+              </span>
+            )}
+          </div>
+
           <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
             <p className="font-medium text-foreground">Bot commands</p>
             <p><code>list</code> — today's drafts</p>
@@ -523,7 +557,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Save */}
+      {/* Save AI/Giphy */}
       <div className="flex items-center gap-3">
         <Button onClick={handleSave} disabled={saving}>
           {saving ? 'Saving…' : 'Save Settings'}

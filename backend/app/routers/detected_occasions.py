@@ -205,7 +205,7 @@ async def _run_scan(chat_ids: list[str], limit_per_chat: int, profile_id: int) -
             break
         db = SessionLocal()
         try:
-            chat_name, messages = await get_chat_messages(chat_id, limit=limit_per_chat)
+            chat_name, messages = await get_chat_messages(chat_id, limit=limit_per_chat, profile_id=profile_id)
             before = db.query(DetectedOccasion).filter(DetectedOccasion.profile_id == profile_id).count()
 
             for msg in messages:
@@ -253,7 +253,7 @@ async def scan_history(
     if body.chat_ids:
         chat_ids = body.chat_ids
     else:
-        chats = await get_wa_chats()
+        chats = await get_wa_chats(profile.id)
         chat_ids = [c["id"] for c in chats]
 
     if not chat_ids:

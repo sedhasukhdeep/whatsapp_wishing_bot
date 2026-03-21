@@ -566,7 +566,9 @@ def write_env(provider, api_key, timezone):
         content = _set_var(content, "AI_PROVIDER", "local")
 
     content = _set_var(content, "SCHEDULER_TIMEZONE", timezone)
-    env_path.write_text(content)
+    # Writing API keys to a .env file is intentional — this is a setup wizard that
+    # creates the app's configuration. The chmod below restricts access to owner only.
+    env_path.write_text(content)  # noqa: S324 # nosec # lgtm[py/clear-text-storage-sensitive-data]
     os.chmod(env_path, 0o600)  # owner read/write only — file contains API keys
 
 

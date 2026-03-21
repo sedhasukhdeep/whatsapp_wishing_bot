@@ -133,7 +133,8 @@ async def process_scheduled_drafts(db: Session | None = None) -> int:
                 continue
             try:
                 final_text = draft.edited_text or draft.generated_text
-                await send_whatsapp_message(send_chat_id, final_text)
+                pid = contact.profile_id if contact else None
+                await send_whatsapp_message(send_chat_id, final_text, profile_id=pid)
                 draft.final_text = final_text
                 draft.status = "sent"
                 draft.sent_at = datetime.now(timezone.utc)

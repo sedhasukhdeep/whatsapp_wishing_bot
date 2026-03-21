@@ -169,7 +169,7 @@ def remove_recipient(
     db.commit()
 
 
-async def _do_retry(broadcast_id: int, message_text: str, recipient_ids: list[int]) -> None:
+async def _do_retry(broadcast_id: int, message_text: str, recipient_ids: list[int], profile_id: int | None = None) -> None:
     from app.database import SessionLocal
     db = SessionLocal()
     try:
@@ -183,9 +183,9 @@ async def _do_retry(broadcast_id: int, message_text: str, recipient_ids: list[in
             try:
                 if r.recipient_type == "contact" and r.contact and r.contact.whatsapp_chat_id:
                     name = r.contact.alias if (r.contact.use_alias_in_broadcast and r.contact.alias) else (r.contact.name or "").split()[0]
-                    await send_whatsapp_message(r.contact.whatsapp_chat_id, message_text.replace("{name}", name))
+                    await send_whatsapp_message(r.contact.whatsapp_chat_id, message_text.replace("{name}", name), profile_id=profile_id)
                 elif r.recipient_type == "target" and r.target:
-                    await send_whatsapp_message(r.target.chat_id, message_text)
+                    await send_whatsapp_message(r.target.chat_id, message_text, profile_id=profile_id)
                 else:
                     r.error = "No WhatsApp chat linked"
                     db.commit()
@@ -219,11 +219,11 @@ async def retry_failed(
     for r in failed:
         r.error = None
     db.commit()
-    background_tasks.add_task(_do_retry, broadcast_id, b.message_text, [r.id for r in failed])
+    background_tasks.add_task(_do_retry, broadcast_id, b.message_text, [r.id for r in failed], profile.id)
     return {"status": "retrying", "count": len(failed)}
 
 
-async def _do_send(broadcast_id: int, message_text: str) -> None:
+async def _do_send(broadcast_id: int, message_text: str, profile_id: int | None = None) -> None:
     from app.database import SessionLocal
     db = SessionLocal()
     try:
@@ -237,9 +237,9 @@ async def _do_send(broadcast_id: int, message_text: str) -> None:
             try:
                 if r.recipient_type == "contact" and r.contact and r.contact.whatsapp_chat_id:
                     name = r.contact.alias if (r.contact.use_alias_in_broadcast and r.contact.alias) else (r.contact.name or "").split()[0]
-                    await send_whatsapp_message(r.contact.whatsapp_chat_id, message_text.replace("{name}", name))
+                    await send_whatsapp_message(r.contact.whatsapp_chat_id, message_text.replace("{name}", name), profile_id=profile_id)
                 elif r.recipient_type == "target" and r.target:
-                    await send_whatsapp_message(r.target.chat_id, message_text)
+                    await send_whatsapp_message(r.target.chat_id, message_text, profile_id=profile_id)
                 else:
                     r.error = "No WhatsApp chat linked"
                     db.commit()
@@ -268,5 +268,5 @@ async def send_broadcast(
     b.status = "sent"
     b.sent_at = datetime.now(timezone.utc)
     db.commit()
-    background_tasks.add_task(_do_send, broadcast_id, b.message_text)
+    background_tasks.add_task(_do_send, broadcast_id, b.message_text, profile.id)
     return {"status": "sending"}
