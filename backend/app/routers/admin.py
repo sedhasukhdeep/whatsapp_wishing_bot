@@ -155,7 +155,7 @@ async def wa_webhook(body: WAWebhookPayload, db: Session = Depends(get_db)):
         reply = "An error occurred. Please try again."
 
     try:
-        await send_whatsapp_message(body.chat_id, reply)
+        await send_whatsapp_message(body.chat_id, reply, profile_id=profile.id)
     except Exception as e:
         logger.warning("Failed to send reply to admin: %s", e)
 
