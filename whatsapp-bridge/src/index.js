@@ -79,7 +79,7 @@ async function bootstrap() {
     console.log('[Bridge] Auto-starting sessions for profiles:', profileIds);
     for (const profileId of profileIds) {
       // Clean stale lock files before init
-      const sessionDir = path.join(SESSION_BASE, `session-profile_${profileId}`, 'session');
+      const sessionDir = path.join(SESSION_BASE, `session-profile_${profileId}`);
       cleanStaleLocks(sessionDir);
       await initSession(profileId);
     }

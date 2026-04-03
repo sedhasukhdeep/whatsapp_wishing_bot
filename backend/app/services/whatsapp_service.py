@@ -46,7 +46,7 @@ async def get_wa_contacts(profile_id: int) -> list[dict]:
 async def get_wa_chats(profile_id: int) -> list[dict]:
     """Fetch list of all WhatsApp chats from the bridge for this profile."""
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.get(
                 f"{settings.wa_bridge_url}/chats",
                 params={"profileId": profile_id},
