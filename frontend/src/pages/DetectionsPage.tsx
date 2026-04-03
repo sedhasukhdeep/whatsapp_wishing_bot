@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { confirmDetection, dismissAllDetections, dismissDetection, getDetectionKeywords, getScanStatus, listContacts, listDetections, startScanHistory, updateDetectionKeywords } from '../api/client';
+import { confirmDetection, dismissAllDetections, dismissDetection, getDetectionKeywords, getScanStatus, listContacts, listDetections, startScanHistory, stopScan, updateDetectionKeywords } from '../api/client';
 import type { Contact, DetectedOccasion, DetectionConfirmRequest, DetectionKeywords, OccasionKeyword, OccasionType } from '../types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -102,7 +102,7 @@ export default function DetectionsPage() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const [scanStatus, setScanStatus] = useState<{
-    running: boolean; scanned: number; detected: number; total: number; error: string | null;
+    running: boolean; scanned: number; detected: number; total: number; error: string | null; current_chat: string | null;
   } | null>(null);
   const [scanError, setScanError] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -152,6 +152,17 @@ export default function DetectionsPage() {
       startPolling();
     } catch (err: unknown) {
       setScanError(err instanceof Error ? err.message : 'Failed to start scan');
+    }
+  }
+
+  async function handleStopScan() {
+    try {
+      await stopScan();
+      stopPolling();
+      const s = await getScanStatus();
+      setScanStatus(s);
+    } catch (err: unknown) {
+      setScanError(err instanceof Error ? err.message : 'Failed to stop scan');
     }
   }
 
@@ -451,9 +462,14 @@ export default function DetectionsPage() {
           <CardContent className="py-3 px-4">
             <div className="flex items-center justify-between text-sm mb-1.5">
               <span className="font-medium">Scanning chat history…</span>
-              <span className="text-muted-foreground">
-                {scanStatus.scanned} / {scanStatus.total} chats · {scanStatus.detected} new
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-muted-foreground">
+                  {scanStatus.scanned} / {scanStatus.total} chats · {scanStatus.detected} new
+                </span>
+                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-destructive hover:text-destructive" onClick={handleStopScan}>
+                  <X className="h-3 w-3 mr-1" /> Cancel
+                </Button>
+              </div>
             </div>
             <div className="w-full bg-muted rounded-full h-1.5">
               <div

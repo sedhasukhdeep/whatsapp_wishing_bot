@@ -248,9 +248,12 @@ export const deleteDetectionHistory = () =>
   api.delete<{ deleted: number }>('/api/detections/history').then((r) => r.data);
 
 export const getScanStatus = () =>
-  api.get<{ running: boolean; scanned: number; detected: number; total: number; error: string | null }>(
+  api.get<{ running: boolean; scanned: number; detected: number; total: number; error: string | null; current_chat: string | null }>(
     '/api/detections/scan-status'
   ).then((r) => r.data);
+
+export const stopScan = () =>
+  api.post<{ ok: boolean }>('/api/detections/scan-stop').then((r) => r.data);
 
 export const startScanHistory = (chat_ids?: string[], limit_per_chat = 200) =>
   api.post<{ status: string; total_chats: number }>('/api/detections/scan-history', {

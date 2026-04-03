@@ -3,6 +3,16 @@ const { getStatus, getChatById, handleDetachedFrame } = require('../sessions');
 
 const router = Router();
 
+/** Races a promise against a timeout; rejects with Error if the timeout fires first. */
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`fetchMessages timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
 // GET /messages/:chatId?profileId=1&limit=200
 router.get('/messages/:chatId', async (req, res) => {
   const profileId = parseInt(req.query.profileId, 10);
@@ -22,7 +32,7 @@ router.get('/messages/:chatId', async (req, res) => {
       return res.status(404).json({ error: 'Chat not found' });
     }
 
-    const messages = await chat.fetchMessages({ limit });
+    const messages = await withTimeout(chat.fetchMessages({ limit }), 30000);
     const result = messages
       .filter((m) => m.type === 'chat' && m.body && m.body.trim())
       .map((m) => ({

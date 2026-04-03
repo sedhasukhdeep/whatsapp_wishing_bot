@@ -198,26 +198,43 @@ async def _run_scan(chat_ids: list[str], limit_per_chat: int, profile_id: int) -
     from app.services.occasion_detection_service import process_message_for_occasion
 
     global _scan_state
-    _scan_state.update({"running": True, "scanned": 0, "detected": 0, "total": len(chat_ids), "error": None})
+    _scan_state.update({"running": True, "scanned": 0, "detected": 0, "total": len(chat_ids), "error": None, "current_chat": None})
 
     for chat_id in chat_ids:
         if not _scan_state["running"]:
             break
+        _scan_state["current_chat"] = chat_id
         db = SessionLocal()
         try:
-            chat_name, messages = await get_chat_messages(chat_id, limit=limit_per_chat, profile_id=profile_id)
+            try:
+                chat_name, messages = await asyncio.wait_for(
+                    get_chat_messages(chat_id, limit=limit_per_chat, profile_id=profile_id),
+                    timeout=45.0,
+                )
+            except asyncio.TimeoutError:
+                logger.warning("Timeout fetching messages from chat %s — skipping", chat_id)
+                _scan_state["scanned"] += 1
+                continue
+
             before = db.query(DetectedOccasion).filter(DetectedOccasion.profile_id == profile_id).count()
 
             for msg in messages:
+                if not _scan_state["running"]:
+                    break
                 try:
-                    await process_message_for_occasion(
-                        chat_id, msg["id"], msg["body"], db,
-                        timestamp=msg.get("timestamp"),
-                        chat_name=chat_name,
-                        sender_jid=msg.get("author"),
-                        sender_name=msg.get("sender_name"),
-                        profile_id=profile_id,
+                    await asyncio.wait_for(
+                        process_message_for_occasion(
+                            chat_id, msg["id"], msg["body"], db,
+                            timestamp=msg.get("timestamp"),
+                            chat_name=chat_name,
+                            sender_jid=msg.get("author"),
+                            sender_name=msg.get("sender_name"),
+                            profile_id=profile_id,
+                        ),
+                        timeout=30.0,
                     )
+                except asyncio.TimeoutError:
+                    logger.warning("Timeout processing message %s in chat %s — skipping", msg.get("id"), chat_id)
                 except Exception:
                     logger.exception("Detection error on message %s", msg.get("id"))
 
@@ -231,12 +248,22 @@ async def _run_scan(chat_ids: list[str], limit_per_chat: int, profile_id: int) -
             db.close()
 
     _scan_state["running"] = False
+    _scan_state["current_chat"] = None
     logger.info("History scan complete: %d chats, %d new detections", _scan_state["total"], _scan_state["detected"])
 
 
 @router.get("/scan-status")
 def scan_status():
     return _scan_state
+
+
+@router.post("/scan-stop")
+def stop_scan():
+    """Cancel a running scan and reset state so a new one can be started."""
+    global _scan_state
+    _scan_state["running"] = False
+    _scan_state["current_chat"] = None
+    return {"ok": True}
 
 
 @router.post("/scan-history")
