@@ -1,5 +1,6 @@
 services:
   wishing-bot:
+    image: wishing-bot:latest
     build:
       context: .
       dockerfile: Dockerfile.single
