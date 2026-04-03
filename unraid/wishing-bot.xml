@@ -1,0 +1,189 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>WishingBot</Name>
+  <Repository>wishing-bot:latest</Repository>
+  <Registry/>
+  <Network>bridge</Network>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Overview>WhatsApp Wishing Bot — automatically sends birthday and anniversary wishes via WhatsApp. Includes a web UI for managing contacts, occasions, and AI settings.&#xA;&#xA;⚠️ This image must be built locally. SSH into Unraid and run:&#xA;  cd /mnt/user/appdata/wishing-bot&#xA;  git pull&#xA;  docker build -t wishing-bot:latest -f Dockerfile.single .&#xA;&#xA;Then start the container from this template.</Overview>
+  <Category>Tools: MediaApp:Other</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <Icon>https://raw.githubusercontent.com/sedhasukhdeep/whatsapp_wishing_bot/master/unraid/icon.png</Icon>
+  <ExtraParams>--restart unless-stopped</ExtraParams>
+
+  <!-- ── Ports ─────────────────────────────────────────────────────────── -->
+  <Config
+    Name="Web UI Port"
+    Target="8080"
+    Default="8080"
+    Mode="tcp"
+    Description="Port for the web interface"
+    Type="Port"
+    Display="always"
+    Required="true"
+    Mask="false">8080</Config>
+
+  <!-- ── Volumes ───────────────────────────────────────────────────────── -->
+  <Config
+    Name="App Data"
+    Target="/app/data"
+    Default="/mnt/user/appdata/wishing-bot/data"
+    Mode="rw"
+    Description="Persistent storage for the SQLite database and bot data"
+    Type="Path"
+    Display="always"
+    Required="true"
+    Mask="false">/mnt/user/appdata/wishing-bot/data</Config>
+
+  <Config
+    Name="WhatsApp Session"
+    Target="/app/wa-bridge/session"
+    Default="/mnt/user/appdata/wishing-bot/session"
+    Mode="rw"
+    Description="WhatsApp Web session files (keeps you logged in across restarts)"
+    Type="Path"
+    Display="always"
+    Required="true"
+    Mask="false">/mnt/user/appdata/wishing-bot/session</Config>
+
+  <!-- ── Network ───────────────────────────────────────────────────────── -->
+  <Config
+    Name="NAS IP"
+    Target="NAS_IP"
+    Default="192.168.1.x"
+    Mode=""
+    Description="Your Unraid server IP address — used to build the web UI URL shown in the app"
+    Type="Variable"
+    Display="always"
+    Required="true"
+    Mask="false">100.126.133.22</Config>
+
+  <!-- ── AI Provider ───────────────────────────────────────────────────── -->
+  <Config
+    Name="AI Provider"
+    Target="AI_PROVIDER"
+    Default="auto"
+    Mode=""
+    Description="Which AI backend to use: auto (local first, then Claude), claude, openai, gemini, or local"
+    Type="Variable"
+    Display="always"
+    Required="true"
+    Mask="false">auto</Config>
+
+  <!-- ── Claude / Anthropic ────────────────────────────────────────────── -->
+  <Config
+    Name="Anthropic API Key"
+    Target="ANTHROPIC_API_KEY"
+    Default=""
+    Mode=""
+    Description="API key for Claude (Anthropic). Get one at https://console.anthropic.com"
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="true"></Config>
+
+  <!-- ── OpenAI ────────────────────────────────────────────────────────── -->
+  <Config
+    Name="OpenAI API Key"
+    Target="OPENAI_API_KEY"
+    Default=""
+    Mode=""
+    Description="API key for OpenAI (ChatGPT). Get one at https://platform.openai.com"
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="true"></Config>
+
+  <Config
+    Name="OpenAI Model"
+    Target="OPENAI_MODEL"
+    Default="gpt-4o-mini"
+    Mode=""
+    Description="OpenAI model to use, e.g. gpt-4o-mini, gpt-4o, gpt-4-turbo"
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false">gpt-4o-mini</Config>
+
+  <!-- ── Google Gemini ─────────────────────────────────────────────────── -->
+  <Config
+    Name="Gemini API Key"
+    Target="GEMINI_API_KEY"
+    Default=""
+    Mode=""
+    Description="API key for Google Gemini. Get one at https://aistudio.google.com"
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="true"></Config>
+
+  <Config
+    Name="Gemini Model"
+    Target="GEMINI_MODEL"
+    Default="gemini-2.0-flash"
+    Mode=""
+    Description="Gemini model to use, e.g. gemini-2.0-flash, gemini-1.5-pro"
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false">gemini-2.0-flash</Config>
+
+  <!-- ── Local AI (LM Studio / Ollama) ─────────────────────────────────── -->
+  <Config
+    Name="Local AI URL"
+    Target="LOCAL_AI_URL"
+    Default="http://192.168.1.x:1234/v1"
+    Mode=""
+    Description="Base URL for a local OpenAI-compatible API server (e.g. LM Studio or Ollama). Use the Tailscale IP if on a different subnet."
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="false">http://100.81.214.144:1234/v1</Config>
+
+  <Config
+    Name="Local AI Model"
+    Target="LOCAL_AI_MODEL"
+    Default=""
+    Mode=""
+    Description="Model name to request from the local AI server. Leave blank to auto-detect the first available model."
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="false"></Config>
+
+  <!-- ── Scheduler ─────────────────────────────────────────────────────── -->
+  <Config
+    Name="Scheduler Timezone"
+    Target="SCHEDULER_TIMEZONE"
+    Default="Australia/Sydney"
+    Mode=""
+    Description="Timezone for the daily wish scheduler. Use IANA format, e.g. America/New_York, Europe/London, Asia/Kolkata"
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false">Australia/Sydney</Config>
+
+  <Config
+    Name="Scheduler Hour"
+    Target="SCHEDULER_HOUR"
+    Default="8"
+    Mode=""
+    Description="Hour of day (0-23) to send wishes (in the timezone above)"
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false">8</Config>
+
+  <Config
+    Name="Scheduler Minute"
+    Target="SCHEDULER_MINUTE"
+    Default="0"
+    Mode=""
+    Description="Minute (0-59) of the hour to send wishes"
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false">0</Config>
+
+</Container>
