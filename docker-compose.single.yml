@@ -1,0 +1,28 @@
+services:
+  wishing-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.single
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - app_data:/app/data
+      - wa_session:/app/wa-bridge/session
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - NAS_IP=${NAS_IP:-100.126.133.22}
+      - SCHEDULER_TIMEZONE=${SCHEDULER_TIMEZONE:-Australia/Sydney}
+      - SCHEDULER_HOUR=${SCHEDULER_HOUR:-8}
+      - SCHEDULER_MINUTE=${SCHEDULER_MINUTE:-0}
+      - AI_PROVIDER=${AI_PROVIDER:-auto}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
+      - LOCAL_AI_URL=${LOCAL_AI_URL:-http://localhost:1234/v1}
+      - LOCAL_AI_MODEL=${LOCAL_AI_MODEL:-}
+
+volumes:
+  app_data:
+  wa_session:

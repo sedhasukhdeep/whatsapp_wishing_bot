@@ -10,9 +10,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.database import Base  # noqa: E402
 import app.models  # noqa: E402, F401 — import all models so metadata is populated
 
+import os
+
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Allow DB_URL env var to override alembic.ini (used in Docker)
+db_url = os.environ.get("DB_URL")
+if db_url:
+    config.set_main_option("sqlalchemy.url", db_url)
 
 target_metadata = Base.metadata
 
