@@ -134,7 +134,7 @@ export default function ContactFormPage() {
   }
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
+    <div className="p-4 md:p-8 max-w-2xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <Button variant="ghost" size="sm" onClick={() => nav('/contacts')} className="gap-1">
           <ArrowLeft size={16} />

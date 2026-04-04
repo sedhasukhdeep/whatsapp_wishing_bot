@@ -313,8 +313,8 @@ export default function DetectionsPage() {
   const groups = groupDetections(visibleDetections);
 
   return (
-    <div className="p-8">
-      <div className="flex items-start justify-between mb-6">
+    <div className="p-4 md:p-8">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Radar size={24} />
@@ -324,7 +324,7 @@ export default function DetectionsPage() {
             Occasions detected from incoming WhatsApp messages. Review and confirm to add them to contacts.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           {groups.length > 0 && (
             <Badge className="text-sm px-3 py-1 bg-primary text-primary-foreground">
               {groups.length} pending

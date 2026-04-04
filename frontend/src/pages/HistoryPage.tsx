@@ -42,17 +42,17 @@ export default function HistoryPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="p-8 text-muted-foreground">Loading...</div>;
-  if (error) return <div className="p-8 text-destructive">{error}</div>;
+  if (loading) return <div className="p-4 md:p-8 text-muted-foreground">Loading...</div>;
+  if (error) return <div className="p-4 md:p-8 text-destructive">{error}</div>;
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <h1 className="text-2xl font-bold mb-6">Sent Messages History</h1>
 
       {history.length === 0 ? (
         <p className="text-muted-foreground text-sm">No sent messages yet.</p>
       ) : (
-        <div className="rounded-md border">
+        <div className="rounded-md border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>

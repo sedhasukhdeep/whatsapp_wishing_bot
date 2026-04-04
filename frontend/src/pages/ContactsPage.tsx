@@ -225,10 +225,10 @@ export default function ContactsPage() {
   const allNewSelected = newCount > 0 && newCount === checkedCount;
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold">Contacts</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {contacts.length > 0 && (
             <Button
               variant="outline"
@@ -264,7 +264,7 @@ export default function ContactsPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name or phone..."
-          className="w-64"
+          className="w-full sm:w-64"
         />
         <div className="flex flex-wrap gap-1.5">
           {['', ...RELATIONSHIPS].map((r) => (
@@ -299,7 +299,7 @@ export default function ContactsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(280px,100%),1fr))] gap-4">
           {contacts.map((c) => (
             <Card key={c.id} data-testid="contact-card" className="relative hover:shadow-sm transition-shadow">
               {c.occasions_count > 0 && (
@@ -525,6 +525,7 @@ export default function ContactsPage() {
           </DialogHeader>
 
           <div className="flex-1 overflow-auto">
+            <div className="overflow-x-auto">
             {syncLoading && (
               <div className="flex items-center justify-center py-16 text-muted-foreground gap-2">
                 <Loader2 size={20} className="animate-spin" />
@@ -618,6 +619,7 @@ export default function ContactsPage() {
                 No WhatsApp contacts found.
               </p>
             )}
+            </div>
           </div>
 
           <DialogFooter className="flex items-center gap-3 pt-4 border-t mt-0">
