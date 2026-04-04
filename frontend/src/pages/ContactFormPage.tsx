@@ -59,6 +59,7 @@ export default function ContactFormPage() {
   const [length, setLength] = useState<LengthType>('medium');
   const [customInstructions, setCustomInstructions] = useState('');
   const [alias, setAlias] = useState('');
+  const [partnerName, setPartnerName] = useState('');
   const [useAliasInBroadcast, setUseAliasInBroadcast] = useState(false);
   const [useAlias, setUseAlias] = useState(false);
   const [autoSend, setAutoSend] = useState(false);
@@ -79,6 +80,7 @@ export default function ContactFormPage() {
         setNotes(c.notes ?? ''); setTone(c.tone_preference); setLanguage(c.language);
         setLength(c.message_length); setCustomInstructions(c.custom_instructions ?? '');
         setAlias(c.alias ?? '');
+        setPartnerName(c.partner_name ?? '');
         setUseAliasInBroadcast(c.use_alias_in_broadcast);
         setUseAlias(c.use_alias);
         setAutoSend(c.auto_send);
@@ -101,6 +103,7 @@ export default function ContactFormPage() {
         name, phone, relationship,
         relationship_label: (relationship === 'other' && relationshipLabel) ? relationshipLabel : null,
         alias: alias || null,
+        partner_name: partnerName || null,
         use_alias_in_broadcast: useAliasInBroadcast,
         use_alias: useAlias,
         auto_send: autoSend,
@@ -174,6 +177,20 @@ export default function ContactFormPage() {
                   </label>
                 </div>
               )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Partner / Spouse Name{' '}
+                <span className="text-muted-foreground font-normal">(for anniversary messages)</span>
+              </label>
+              <Input
+                value={partnerName}
+                onChange={(e) => setPartnerName(e.target.value)}
+                placeholder="e.g. Chachi ji, Sunita, Priya…"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                If set, anniversary messages will address both partners by name. Leave blank to let AI infer from alias (e.g. Chachu ji → Chachi ji).
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Phone * (international format)</label>

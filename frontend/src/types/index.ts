@@ -21,6 +21,7 @@ export interface Contact {
   language: string;
   message_length: LengthType;
   custom_instructions: string | null;
+  partner_name: string | null;
   whatsapp_chat_id: string | null;
   whatsapp_chat_name: string | null;
   occasions_count: number;

@@ -24,6 +24,7 @@ class ContactBase(BaseModel):
     language: str = "en"
     message_length: LengthType = "medium"
     custom_instructions: str | None = None
+    partner_name: str | None = None
     whatsapp_chat_id: str | None = None
     whatsapp_chat_name: str | None = None
 

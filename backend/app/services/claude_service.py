@@ -85,10 +85,31 @@ def _build_prompt(
     # Use alias in the AI prompt if configured
     display_name = contact.alias if (contact.alias and contact.use_alias) else contact.name
 
-    parts = [
-        f"Write a {tone} {occasion_display} WhatsApp message for {display_name} ({contact.relationship}).",
-        f"Language: {language}. Length: {length_hint}.",
-    ]
+    is_anniversary = occasion.type == "anniversary"
+
+    if is_anniversary:
+        if contact.partner_name:
+            # Explicit partner name — address both by name
+            parts = [
+                f"Write a {tone} {occasion_display} WhatsApp message for {display_name} and {contact.partner_name} ({contact.relationship}).",
+                f"The message should warmly celebrate both of them together.",
+                f"Language: {language}. Length: {length_hint}.",
+            ]
+        else:
+            # No explicit partner — let the AI infer the counterpart from the name/alias.
+            # e.g. "Chachu ji" → "Chachi ji", "Mama ji" → "Mami ji", "Nana ji" → "Nani ji"
+            parts = [
+                f"Write a {tone} {occasion_display} WhatsApp message for {display_name} ({contact.relationship}).",
+                f"This is an anniversary — naturally include and celebrate both partners in the message.",
+                f"If the name or alias implies a specific family title (e.g. 'Chachu ji' implies 'Chachi ji', 'Mama ji' implies 'Mami ji', 'Nana ji' implies 'Nani ji', 'Dada ji' implies 'Dadi ji'), use the corresponding form for the partner naturally.",
+                f"Language: {language}. Length: {length_hint}.",
+            ]
+    else:
+        parts = [
+            f"Write a {tone} {occasion_display} WhatsApp message for {display_name} ({contact.relationship}).",
+            f"Language: {language}. Length: {length_hint}.",
+        ]
+
     if contact.notes:
         parts.append(f"Personal details to weave in: {contact.notes}.")
     if instructions:

@@ -26,6 +26,7 @@ class Contact(Base):
     use_alias: Mapped[bool] = mapped_column(nullable=False, default=False)
     auto_send: Mapped[bool] = mapped_column(nullable=False, default=False)
     relationship_label: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    partner_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     whatsapp_chat_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     whatsapp_chat_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
