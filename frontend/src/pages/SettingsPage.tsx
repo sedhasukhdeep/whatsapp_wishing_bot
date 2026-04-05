@@ -173,10 +173,10 @@ export default function SettingsPage() {
     }
   };
 
-  const showClaudeFields = aiProvider === 'claude' || aiProvider === 'auto';
-  const showOpenAIFields = aiProvider === 'openai';
-  const showGeminiFields = aiProvider === 'gemini';
-  const showLocalFields = aiProvider === 'local' || aiProvider === 'auto';
+  const showClaudeFields = true;
+  const showOpenAIFields = true;
+  const showGeminiFields = true;
+  const showLocalFields = true;
 
   if (loading) {
     return (
@@ -265,6 +265,10 @@ export default function SettingsPage() {
             </Select>
           </Field>
 
+          <div className="border-t pt-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">Claude (Anthropic)</p>
+          </div>
+
           {showClaudeFields && (
             <>
               <Field
@@ -309,6 +313,10 @@ export default function SettingsPage() {
               </Field>
             </>
           )}
+
+          <div className="border-t pt-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">OpenAI</p>
+          </div>
 
           {showOpenAIFields && (
             <>
@@ -355,6 +363,10 @@ export default function SettingsPage() {
             </>
           )}
 
+          <div className="border-t pt-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">Google Gemini</p>
+          </div>
+
           {showGeminiFields && (
             <>
               <Field
@@ -399,6 +411,10 @@ export default function SettingsPage() {
               </Field>
             </>
           )}
+
+          <div className="border-t pt-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">Local AI (LM Studio / Ollama)</p>
+          </div>
 
           {showLocalFields && (
             <>
