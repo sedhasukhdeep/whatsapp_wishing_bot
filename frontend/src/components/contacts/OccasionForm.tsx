@@ -84,12 +84,12 @@ export default function OccasionForm({ contactId, occasion, onSave, onCancel }: 
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onCancel(); }}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" data-testid="occasion-modal">
+      <DialogContent className="max-w-md flex flex-col max-h-[90vh]" data-testid="occasion-modal">
         <DialogHeader>
           <DialogTitle>{occasion ? 'Edit Occasion' : 'Add Occasion'}</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form id="occasion-form" onSubmit={handleSubmit} className="space-y-3 overflow-y-auto flex-1 min-h-0 pr-1">
           <div>
             <label className="block text-sm font-medium mb-1">Type</label>
             <Select value={type} onValueChange={(v) => setType(v as OccasionType)}>
@@ -233,12 +233,12 @@ export default function OccasionForm({ contactId, occasion, onSave, onCancel }: 
           )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-            <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
-          </DialogFooter>
         </form>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+          <Button type="submit" form="occasion-form" disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
