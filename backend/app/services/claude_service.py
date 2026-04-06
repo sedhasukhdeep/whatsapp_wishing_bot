@@ -240,9 +240,49 @@ def _extract_clean_message(text: str) -> str:
     return text
 
 
+async def _try_configured_providers(prompt: str, ai: dict) -> str:
+    """Try Claude → OpenAI → Gemini in order, using whichever keys are configured.
+
+    Raises RuntimeError if no provider succeeds.
+    """
+    errors: list[str] = []
+
+    if ai.get("anthropic_api_key"):
+        try:
+            logger.info("Fallback: trying Claude")
+            return await _generate_claude(prompt, ai["anthropic_api_key"], ai["claude_model"])
+        except Exception as e:
+            logger.warning("Fallback: Claude failed (%s)", e)
+            errors.append(f"claude: {e}")
+
+    if ai.get("openai_api_key"):
+        try:
+            logger.info("Fallback: trying OpenAI")
+            return await _generate_openai(prompt, ai["openai_api_key"], ai["openai_model"])
+        except Exception as e:
+            logger.warning("Fallback: OpenAI failed (%s)", e)
+            errors.append(f"openai: {e}")
+
+    if ai.get("gemini_api_key"):
+        try:
+            logger.info("Fallback: trying Gemini")
+            return await _generate_gemini(prompt, ai["gemini_api_key"], ai["gemini_model"])
+        except Exception as e:
+            logger.warning("Fallback: Gemini failed (%s)", e)
+            errors.append(f"gemini: {e}")
+
+    raise RuntimeError(
+        "No AI provider is available. "
+        + (f"Tried: {'; '.join(errors)}" if errors else "No API keys are configured.")
+    )
+
+
 async def _call_provider(prompt: str, ai: dict) -> str:
     """Routes to the correct AI provider and returns the generated text."""
     provider = ai["ai_provider"]
+
+    if provider == "claude":
+        return await _generate_claude(prompt, ai["anthropic_api_key"], ai["claude_model"])
 
     if provider == "openai":
         return await _generate_openai(prompt, ai["openai_api_key"], ai["openai_model"])
@@ -252,28 +292,26 @@ async def _call_provider(prompt: str, ai: dict) -> str:
 
     if provider == "local":
         model = await _detect_local_model(ai["local_ai_url"], ai["local_ai_model"])
-        if not model:
-            raise RuntimeError(
-                "Local AI provider configured but no local model is available. "
-                "Start LM Studio or Ollama and load a model."
-            )
-        logger.info("Using local AI provider")
-        return await _generate_local(prompt, model, ai["local_ai_url"])
+        if model:
+            try:
+                logger.info("Using local AI provider")
+                return await _generate_local(prompt, model, ai["local_ai_url"])
+            except Exception as e:
+                logger.warning("Local AI failed (%s), trying other providers", e)
+        else:
+            logger.warning("Local AI not available, trying other configured providers")
+        return await _try_configured_providers(prompt, ai)
 
-    if provider == "claude":
-        return await _generate_claude(prompt, ai["anthropic_api_key"], ai["claude_model"])
-
-    # auto: try local first, fall back to Claude
+    # auto: try local first, then fall back to any configured cloud provider
     model = await _detect_local_model(ai["local_ai_url"], ai["local_ai_model"])
     if model:
         try:
             logger.info("Auto: using local AI provider")
             return await _generate_local(prompt, model, ai["local_ai_url"])
         except Exception as e:
-            logger.warning("Local AI failed (%s), falling back to Claude", e)
+            logger.warning("Auto: local AI failed (%s), trying other providers", e)
 
-    logger.info("Auto: using Claude")
-    return await _generate_claude(prompt, ai["anthropic_api_key"], ai["claude_model"])
+    return await _try_configured_providers(prompt, ai)
 
 
 async def call_ai_raw(system_prompt: str, user_message: str, db=None, max_tokens: int = 512) -> str:
@@ -327,26 +365,53 @@ async def call_ai_raw(system_prompt: str, user_message: str, db=None, max_tokens
         )
         return response.choices[0].message.content.strip()
 
+    async def _try_raw_fallbacks() -> str:
+        errors: list[str] = []
+        if ai.get("anthropic_api_key"):
+            try:
+                return await _claude()
+            except Exception as e:
+                errors.append(f"claude: {e}")
+        if ai.get("openai_api_key"):
+            try:
+                return await _openai()
+            except Exception as e:
+                errors.append(f"openai: {e}")
+        if ai.get("gemini_api_key"):
+            try:
+                return await _gemini()
+            except Exception as e:
+                errors.append(f"gemini: {e}")
+        raise RuntimeError(
+            "No AI provider is available. "
+            + (f"Tried: {'; '.join(errors)}" if errors else "No API keys are configured.")
+        )
+
+    if provider == "claude":
+        return await _claude()
     if provider == "openai":
         return await _openai()
     if provider == "gemini":
         return await _gemini()
     if provider == "local":
         model = await _detect_local_model(ai["local_ai_url"], ai["local_ai_model"])
-        if not model:
-            raise RuntimeError("Local AI configured but no model is available")
-        return await _local(model)
-    if provider == "claude":
-        return await _claude()
+        if model:
+            try:
+                return await _local(model)
+            except Exception as e:
+                logger.warning("call_ai_raw: local failed (%s), trying other providers", e)
+        else:
+            logger.warning("call_ai_raw: local not available, trying other providers")
+        return await _try_raw_fallbacks()
 
-    # auto: try local first, fall back to Claude
+    # auto: try local first, fall back to any configured provider
     model = await _detect_local_model(ai["local_ai_url"], ai["local_ai_model"])
     if model:
         try:
             return await _local(model)
         except Exception as e:
-            logger.warning("call_ai_raw: local failed (%s), falling back to Claude", e)
-    return await _claude()
+            logger.warning("call_ai_raw: local failed (%s), trying other providers", e)
+    return await _try_raw_fallbacks()
 
 
 async def generate_message(
