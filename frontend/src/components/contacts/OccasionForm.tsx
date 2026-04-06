@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { createOccasion, updateOccasion } from '../../api/client';
 import type { LengthType, Occasion, OccasionType, ToneType } from '../../types';
 import {
@@ -29,8 +29,10 @@ interface Props {
 }
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+// '_default' is a sentinel meaning "same as contact" — converted to null before saving.
+// Radix UI's Select does not allow empty-string values on SelectItem.
 const LANGUAGES = [
-  { code: '', label: 'Same as contact' },
+  { code: '_default', label: 'Same as contact' },
   { code: 'en', label: 'English' },
   { code: 'hi', label: 'Hindi' },
   { code: 'pa', label: 'Punjabi' },
@@ -48,8 +50,9 @@ export default function OccasionForm({ contactId, occasion, onSave, onCancel }: 
   const [year, setYear] = useState<string>(occasion?.year?.toString() ?? '');
   const [active, setActive] = useState(occasion?.active ?? true);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const advancedRef = useRef<HTMLDivElement>(null);
   const [toneOverride, setToneOverride] = useState<string>(occasion?.tone_override ?? '');
-  const [languageOverride, setLanguageOverride] = useState<string>(occasion?.language_override ?? '');
+  const [languageOverride, setLanguageOverride] = useState<string>(occasion?.language_override || '_default');
   const [lengthOverride, setLengthOverride] = useState<string>(occasion?.length_override ?? '');
   const [instructionsOverride, setInstructionsOverride] = useState<string>(occasion?.custom_instructions_override ?? '');
   const [saving, setSaving] = useState(false);
@@ -64,7 +67,7 @@ export default function OccasionForm({ contactId, occasion, onSave, onCancel }: 
         contact_id: contactId, type, label: label || null,
         month, day, year: year ? parseInt(year) : null, active,
         tone_override: toneOverride || null,
-        language_override: languageOverride || null,
+        language_override: (languageOverride && languageOverride !== '_default') ? languageOverride : null,
         length_override: lengthOverride || null,
         custom_instructions_override: instructionsOverride || null,
       };
@@ -150,7 +153,16 @@ export default function OccasionForm({ contactId, occasion, onSave, onCancel }: 
           {/* Advanced overrides toggle */}
           <button
             type="button"
-            onClick={() => setShowAdvanced((v) => !v)}
+            onClick={() => {
+              setShowAdvanced((v) => {
+                const next = !v;
+                if (next) {
+                  // Scroll the advanced section into view after React renders it
+                  setTimeout(() => advancedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+                }
+                return next;
+              });
+            }}
             className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             {showAdvanced ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -158,7 +170,7 @@ export default function OccasionForm({ contactId, occasion, onSave, onCancel }: 
           </button>
 
           {showAdvanced && (
-            <div className="space-y-3 p-3 bg-muted/30 rounded-lg border">
+            <div ref={advancedRef} className="space-y-3 p-3 bg-muted/30 rounded-lg border">
               <p className="text-xs text-muted-foreground">Leave blank to use the contact's default settings.</p>
 
               <div>
