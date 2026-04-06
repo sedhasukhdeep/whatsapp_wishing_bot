@@ -24,6 +24,8 @@ export interface Contact {
   partner_name: string | null;
   whatsapp_chat_id: string | null;
   whatsapp_chat_name: string | null;
+  occasion_chat_id: string | null;
+  occasion_chat_name: string | null;
   occasions_count: number;
   created_at: string;
   updated_at: string;

@@ -29,6 +29,9 @@ class Contact(Base):
     partner_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     whatsapp_chat_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     whatsapp_chat_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # Separate occasion target — can point to a group chat while whatsapp_chat_id stays as 1:1
+    occasion_chat_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    occasion_chat_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=func.now(), onupdate=func.now()

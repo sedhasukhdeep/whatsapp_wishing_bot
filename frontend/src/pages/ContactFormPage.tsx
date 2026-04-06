@@ -65,6 +65,8 @@ export default function ContactFormPage() {
   const [autoSend, setAutoSend] = useState(false);
   const [whatsappChatId, setWhatsappChatId] = useState<string | null>(null);
   const [whatsappChatName, setWhatsappChatName] = useState<string | null>(null);
+  const [occasionChatId, setOccasionChatId] = useState<string | null>(null);
+  const [occasionChatName, setOccasionChatName] = useState<string | null>(null);
   const [occasions, setOccasions] = useState<Occasion[]>([]);
   const [showOccasionForm, setShowOccasionForm] = useState(false);
   const [editingOccasion, setEditingOccasion] = useState<Occasion | undefined>();
@@ -86,6 +88,8 @@ export default function ContactFormPage() {
         setAutoSend(c.auto_send);
         setWhatsappChatId(c.whatsapp_chat_id);
         setWhatsappChatName(c.whatsapp_chat_name);
+        setOccasionChatId(c.occasion_chat_id);
+        setOccasionChatName(c.occasion_chat_name);
         setOccasions(c.occasions);
         if (c.language !== 'en' || c.message_length !== 'medium' || c.custom_instructions) {
           setAdvancedMode(true);
@@ -114,6 +118,8 @@ export default function ContactFormPage() {
         custom_instructions: customInstructions || null,
         whatsapp_chat_id: whatsappChatId,
         whatsapp_chat_name: whatsappChatName,
+        occasion_chat_id: occasionChatId,
+        occasion_chat_name: occasionChatName,
       };
       if (isEdit) {
         await updateContact(Number(id), data);
@@ -239,21 +245,38 @@ export default function ContactFormPage() {
           </CardContent>
         </Card>
 
-        {/* WhatsApp Chat */}
+        {/* Campaign / Broadcast Chat */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">WhatsApp Chat</CardTitle>
+            <CardTitle className="text-sm font-semibold">Campaign / Broadcast Chat</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-3">
-              Link this contact to a WhatsApp chat for one-click sending.
+              1:1 chat used for broadcast messages and campaigns. Auto-populated when syncing from WhatsApp.
             </p>
             <ChatPicker
               chatId={whatsappChatId}
               chatName={whatsappChatName}
               onChange={(cid, cname) => { setWhatsappChatId(cid); setWhatsappChatName(cname); }}
             />
-            {whatsappChatId && (
+          </CardContent>
+        </Card>
+
+        {/* Occasion Wishes Chat */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">Occasion Wishes Chat</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">
+              Where birthday and anniversary wishes are sent. Can be a group chat. Falls back to the Campaign chat if not set.
+            </p>
+            <ChatPicker
+              chatId={occasionChatId}
+              chatName={occasionChatName}
+              onChange={(cid, cname) => { setOccasionChatId(cid); setOccasionChatName(cname); }}
+            />
+            {(occasionChatId || whatsappChatId) && (
               <label className="flex items-center gap-2 mt-3 cursor-pointer text-sm">
                 <input
                   type="checkbox"

@@ -87,9 +87,10 @@ async def approve_draft(
     db.refresh(draft)
 
     contact = draft.contact
-    if contact and contact.auto_send and contact.whatsapp_chat_id:
+    occasion_chat = contact.occasion_chat_id or contact.whatsapp_chat_id if contact else None
+    if contact and contact.auto_send and occasion_chat:
         final_text = draft.edited_text or draft.generated_text
-        await send_whatsapp_message(contact.whatsapp_chat_id, final_text, profile_id=profile.id)
+        await send_whatsapp_message(occasion_chat, final_text, profile_id=profile.id)
         draft.final_text = final_text
         draft.status = "sent"
         draft.sent_at = datetime.now(timezone.utc)
@@ -175,12 +176,13 @@ async def send_draft(
         target_id = target.id
     else:
         contact = draft.contact
-        if not contact or not contact.whatsapp_chat_id:
+        # Occasion drafts prefer the occasion-specific chat; fall back to broadcast chat
+        chat_id = (contact.occasion_chat_id or contact.whatsapp_chat_id) if contact else None
+        if not chat_id:
             raise HTTPException(
                 status_code=400,
                 detail="No WhatsApp target specified and contact has no linked WhatsApp chat",
             )
-        chat_id = contact.whatsapp_chat_id
         target_id = None
 
     final_text = draft.edited_text or draft.generated_text

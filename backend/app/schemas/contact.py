@@ -27,6 +27,8 @@ class ContactBase(BaseModel):
     partner_name: str | None = None
     whatsapp_chat_id: str | None = None
     whatsapp_chat_name: str | None = None
+    occasion_chat_id: str | None = None
+    occasion_chat_name: str | None = None
 
     @field_validator("name")
     @classmethod
