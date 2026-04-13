@@ -46,7 +46,6 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
   const [success, setSuccess] = useState('');
   const [confirmRegen, setConfirmRegen] = useState(false);
   const [gifUrl, setGifUrl] = useState<string | null>(null);
-  const [gifPreview, setGifPreview] = useState<string | null>(null);
   const [showGifPicker, setShowGifPicker] = useState(false);
 
   // Feedback for regeneration
@@ -60,7 +59,6 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
   useEffect(() => {
     setText(draft?.edited_text ?? draft?.generated_text ?? '');
     setGifUrl(draft?.gif_url ?? null);
-    setGifPreview(null);
   }, [draft?.id]);
 
   const linkedChat = contact.whatsapp_chat_id;
@@ -207,7 +205,7 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
                   className="h-24 rounded border"
                 />
                 <button
-                  onClick={() => { setGifUrl(null); setGifPreview(null); }}
+                  onClick={() => setGifUrl(null)}
                   className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center"
                 >
                   <X size={10} />
@@ -337,9 +335,8 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
 
         {showGifPicker && (
           <GifPicker
-            onSelect={(mp4, preview) => {
+            onSelect={(mp4, _preview) => {
               setGifUrl(mp4);
-              setGifPreview(preview);
               setShowGifPicker(false);
             }}
             onCancel={() => setShowGifPicker(false)}
