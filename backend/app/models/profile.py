@@ -15,4 +15,5 @@ class Profile(Base):
     wa_admin_chat_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     wa_admin_chat_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     notifications_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    detections_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=func.now())

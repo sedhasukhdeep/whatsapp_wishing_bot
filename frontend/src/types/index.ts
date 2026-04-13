@@ -306,6 +306,7 @@ export interface Profile {
   wa_admin_chat_id: string | null;
   wa_admin_chat_name: string | null;
   notifications_enabled: boolean;
+  detections_enabled: boolean;
   created_at: string;
 }
 

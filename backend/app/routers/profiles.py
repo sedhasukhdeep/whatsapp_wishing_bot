@@ -67,6 +67,8 @@ def update_profile(
         profile.wa_admin_chat_name = body.wa_admin_chat_name or None
     if body.notifications_enabled is not None:
         profile.notifications_enabled = body.notifications_enabled
+    if body.detections_enabled is not None:
+        profile.detections_enabled = body.detections_enabled
 
     try:
         db.commit()

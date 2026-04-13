@@ -74,6 +74,7 @@ export default function SettingsPage() {
   const [adminChatId, setAdminChatId] = useState(profile?.wa_admin_chat_id ?? '');
   const [adminChatName, setAdminChatName] = useState(profile?.wa_admin_chat_name ?? '');
   const [adminNotificationsEnabled, setAdminNotificationsEnabled] = useState(profile?.notifications_enabled ?? true);
+  const [detectionsEnabled, setDetectionsEnabled] = useState(profile?.detections_enabled ?? true);
   const [waChats, setWaChats] = useState<WaChat[]>([]);
   const [waChatsLoading, setWaChatsLoading] = useState(false);
   const [adminSaved, setAdminSaved] = useState(false);
@@ -162,6 +163,7 @@ export default function SettingsPage() {
         wa_admin_chat_id: adminChatId !== '' ? adminChatId : null,
         wa_admin_chat_name: adminChatName !== '' ? adminChatName : null,
         notifications_enabled: adminNotificationsEnabled,
+        detections_enabled: detectionsEnabled,
       });
       setProfile(updated);
       setAdminSaved(true);
@@ -549,6 +551,22 @@ export default function SettingsPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <Switch
+              id="detections-enabled"
+              checked={detectionsEnabled}
+              onCheckedChange={setDetectionsEnabled}
+            />
+            <label htmlFor="detections-enabled" className="text-sm font-medium cursor-pointer">
+              Enable automatic occasion detection
+            </label>
+          </div>
+          {!detectionsEnabled && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Occasion detection is off — incoming messages will not be scanned for birthdays or anniversaries.
+            </p>
+          )}
+
+          <div className="flex items-center gap-3">
             <Button onClick={handleAdminSave} disabled={adminSaving}>
               {adminSaving ? 'Saving…' : 'Save Notification Settings'}
             </Button>
@@ -563,6 +581,7 @@ export default function SettingsPage() {
           <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
             <p className="font-medium text-foreground">Bot commands</p>
             <p><code>list</code> — today's drafts</p>
+            <p><code>preview &lt;id&gt;</code> — full message + GIF</p>
             <p><code>approve &lt;id&gt;</code></p>
             <p><code>send &lt;id&gt;</code></p>
             <p><code>skip &lt;id&gt;</code></p>

@@ -113,18 +113,26 @@ async def wa_webhook(body: WAWebhookPayload, db: Session = Depends(get_db)):
     from app.services.occasion_detection_service import process_message_for_occasion
     from app.services.whatsapp_service import send_whatsapp_message
 
-    # Run occasion detection scoped to the profile that received the message
-    try:
-        await process_message_for_occasion(
-            body.chat_id, body.message_id, body.body, db,
-            timestamp=body.timestamp,
-            chat_name=body.chat_name,
-            sender_jid=body.author,
-            sender_name=body.sender_name,
-            profile_id=body.profile_id,
-        )
-    except Exception:
-        logger.exception("Occasion detection failed for message %s", body.message_id)
+    # Run occasion detection scoped to the profile that received the message,
+    # unless the profile has detections disabled.
+    _detections_enabled = True
+    if body.profile_id is not None:
+        _p = db.get(Profile, body.profile_id)
+        if _p is not None:
+            _detections_enabled = _p.detections_enabled
+
+    if _detections_enabled:
+        try:
+            await process_message_for_occasion(
+                body.chat_id, body.message_id, body.body, db,
+                timestamp=body.timestamp,
+                chat_name=body.chat_name,
+                sender_jid=body.author,
+                sender_name=body.sender_name,
+                profile_id=body.profile_id,
+            )
+        except Exception:
+            logger.exception("Occasion detection failed for message %s", body.message_id)
 
     # Route admin commands to whichever profile has this chat as its admin chat.
     # Prefer body.profile_id (bridge-supplied) for direct lookup; fall back to

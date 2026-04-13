@@ -52,6 +52,7 @@ class ProfileUpdate(BaseModel):
     wa_admin_chat_id: str | None = None
     wa_admin_chat_name: str | None = None
     notifications_enabled: bool | None = None
+    detections_enabled: bool | None = None
 
 
 class ProfileOut(BaseModel):
@@ -63,6 +64,7 @@ class ProfileOut(BaseModel):
     wa_admin_chat_id: str | None
     wa_admin_chat_name: str | None
     notifications_enabled: bool
+    detections_enabled: bool
     created_at: datetime
 
     @classmethod
@@ -74,6 +76,7 @@ class ProfileOut(BaseModel):
             wa_admin_chat_id=p.wa_admin_chat_id,  # type: ignore[attr-defined]
             wa_admin_chat_name=p.wa_admin_chat_name,  # type: ignore[attr-defined]
             notifications_enabled=p.notifications_enabled,  # type: ignore[attr-defined]
+            detections_enabled=p.detections_enabled,  # type: ignore[attr-defined]
             created_at=p.created_at,  # type: ignore[attr-defined]
         )
 
