@@ -277,7 +277,7 @@ export const createProfile = (data: { name: string; pin?: string }) =>
 export const verifyProfilePin = (id: number, pin: string) =>
   api.post<{ ok: boolean }>(`/api/profiles/${id}/verify-pin`, { pin }).then((r) => r.data);
 
-export const updateProfile = (id: number, data: Partial<{ name: string; pin: string | null; wa_admin_chat_id: string | null; wa_admin_chat_name: string | null; notifications_enabled: boolean }>) =>
+export const updateProfile = (id: number, data: Partial<{ name: string; pin: string | null; wa_admin_chat_id: string | null; wa_admin_chat_name: string | null; notifications_enabled: boolean; detections_enabled: boolean }>) =>
   api.put<Profile>(`/api/profiles/${id}`, data).then((r) => r.data);
 
 export const deleteProfile = (id: number) =>
