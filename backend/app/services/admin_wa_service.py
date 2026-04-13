@@ -159,6 +159,7 @@ async def handle_command(command: str, args: list[str], db: Session, profile_id:
         return (
             "Available commands:\n"
             "• list — today's drafts\n"
+            "• preview <id> — full message text + GIF\n"
             "• approve <id> — approve draft\n"
             "• send <id> — approve and send\n"
             "• skip <id> — skip draft\n"
@@ -204,6 +205,27 @@ async def handle_command(command: str, args: list[str], db: Session, profile_id:
             for occ in occasions:
                 upcoming.append((occ, occ.contact, delta))
         return format_upcoming_notification(upcoming)
+
+    if command == "preview":
+        if not args:
+            return "Usage: preview <draft_id>"
+        try:
+            draft_id = int(args[0].lstrip("#"))
+        except ValueError:
+            return f"Invalid draft ID: {args[0]}"
+
+        draft = db.query(MessageDraft).filter(MessageDraft.id == draft_id).first()
+        if not draft:
+            return f"Draft #{draft_id} not found."
+
+        contact = draft.contact
+        contact_name = contact.name if contact else "Unknown"
+        text = draft.edited_text or draft.generated_text or "(no text generated)"
+
+        lines = [f"📋 Draft #{draft_id} — {contact_name}", f"Status: {draft.status}", "", text]
+        if draft.gif_url:
+            lines.append(f"\n🎞 GIF: {draft.gif_url}")
+        return "\n".join(lines)
 
     if command in ("approve", "send", "skip", "regenerate"):
         if not args:

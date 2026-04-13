@@ -196,9 +196,16 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
             )}
 
             {/* GIF preview */}
-            {gifPreview && (
+            {gifUrl && (
               <div className="relative inline-block mb-3">
-                <img src={gifPreview} alt="Selected GIF" className="h-24 rounded border" />
+                <video
+                  src={gifUrl}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="h-24 rounded border"
+                />
                 <button
                   onClick={() => { setGifUrl(null); setGifPreview(null); }}
                   className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center"
