@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { confirmDetection, dismissAllDetections, dismissDetection, getDetectionKeywords, getScanStatus, listContacts, listDetections, startScanHistory, stopScan, updateDetectionKeywords } from '../api/client';
 import type { Contact, DetectedOccasion, DetectionConfirmRequest, DetectionKeywords, OccasionKeyword, OccasionType } from '../types';
+import { useProfile } from '../context/ProfileContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -93,6 +94,8 @@ interface ConfirmState {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function DetectionsPage() {
+  const { profile } = useProfile();
+  const detectionsEnabled = profile?.detections_enabled ?? true;
   const [detections, setDetections] = useState<DetectedOccasion[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -353,7 +356,7 @@ export default function DetectionsPage() {
             variant="outline"
             className="gap-2"
             onClick={handleScanHistory}
-            disabled={scanStatus?.running}
+            disabled={scanStatus?.running || !detectionsEnabled}
           >
             {scanStatus?.running
               ? <Loader2 size={16} className="animate-spin" />

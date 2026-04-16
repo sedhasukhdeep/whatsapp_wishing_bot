@@ -1,5 +1,6 @@
 import logging
 from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session, selectinload
 
@@ -143,7 +144,9 @@ async def send_admin_notification(
 
 
 async def handle_command(command: str, args: list[str], db: Session, profile_id: int | None = None) -> str:
-    today = date.today()
+    from app.config import settings
+    _tz = ZoneInfo(settings.scheduler_timezone)
+    today = datetime.now(_tz).date()
 
     def _occasions_query():
         q = (

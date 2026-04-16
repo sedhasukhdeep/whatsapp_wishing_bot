@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { approveDraft, regenerateDraft, scheduleDraft, sendDraft, skipDraft } from '../../api/client';
+import { approveDraft, regenerateDraft, scheduleDraft, sendDraft, skipDraft, updateDraftGif } from '../../api/client';
 import type { DashboardOccasionItem, MessageDraft, WhatsAppTarget } from '../../types';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import StatusBadge from '../shared/StatusBadge';
@@ -205,7 +205,10 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
                   className="h-24 rounded border"
                 />
                 <button
-                  onClick={() => setGifUrl(null)}
+                  onClick={() => {
+                    setGifUrl(null);
+                    if (currentDraft) updateDraftGif(currentDraft.id, null).catch(() => {});
+                  }}
                   className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center"
                 >
                   <X size={10} />
@@ -338,6 +341,9 @@ export default function TodayCard({ item, targets, onUpdate }: Props) {
             onSelect={(mp4, _preview) => {
               setGifUrl(mp4);
               setShowGifPicker(false);
+              if (currentDraft) {
+                updateDraftGif(currentDraft.id, mp4).catch(() => {});
+              }
             }}
             onCancel={() => setShowGifPicker(false)}
           />

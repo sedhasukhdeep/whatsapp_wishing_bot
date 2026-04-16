@@ -45,6 +45,10 @@ class DraftScheduleRequest(BaseModel):
     scheduled_for: datetime
 
 
+class DraftGifRequest(BaseModel):
+    gif_url: str | None = None
+
+
 # Dashboard composite response
 class DashboardOccasionItem(BaseModel):
     occasion: OccasionOut

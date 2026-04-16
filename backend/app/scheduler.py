@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from datetime import date, datetime, timezone
+from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -27,7 +28,7 @@ async def daily_occasion_check(db: Session | None = None, profile_id: int | None
         db = SessionLocal()
 
     try:
-        today = date.today()
+        today = datetime.now(ZoneInfo(settings.scheduler_timezone)).date()
         q = (
             db.query(Occasion)
             .options(selectinload(Occasion.contact))

@@ -271,6 +271,8 @@ async def scan_history(
     body: ScanHistoryRequest,
     profile: Profile = Depends(get_current_profile),
 ):
+    if not profile.detections_enabled:
+        raise HTTPException(status_code=403, detail="Occasion detection is disabled for this profile")
     global _scan_state
     if _scan_state["running"]:
         raise HTTPException(status_code=409, detail="A scan is already running")

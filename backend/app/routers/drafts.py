@@ -9,6 +9,7 @@ from app.models import Contact, MessageDraft, WhatsAppTarget
 from app.models.profile import Profile
 from app.schemas.message_draft import (
     DraftApproveRequest,
+    DraftGifRequest,
     DraftHistoryItem,
     DraftScheduleRequest,
     DraftSendRequest,
@@ -97,6 +98,22 @@ async def approve_draft(
         db.commit()
         db.refresh(draft)
 
+    return draft
+
+
+@router.patch("/{draft_id}/gif", response_model=MessageDraftOut)
+def update_draft_gif(
+    draft_id: int,
+    body: DraftGifRequest,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+):
+    draft = _draft_or_404(draft_id, profile, db)
+    if draft.status == "sent":
+        raise HTTPException(status_code=400, detail="Cannot modify a sent draft")
+    draft.gif_url = body.gif_url
+    db.commit()
+    db.refresh(draft)
     return draft
 
 
