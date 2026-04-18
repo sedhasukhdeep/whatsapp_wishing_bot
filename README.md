@@ -8,7 +8,9 @@ Send AI-generated birthday, anniversary, and occasion greetings via WhatsApp —
 
 ## Table of Contents
 
-- [Regular computer (Mac / Windows / Linux)](#quick-start-mac--windows--linux)
+- [Mac / Linux — one-line install](#mac--linux--one-line-install)
+- [Mac / Linux — manual (no terminal)](#manual-setup-no-terminal)
+- [Windows](#windows-setup)
 - [Unraid NAS](#unraid-nas-installation)
 - [Features](#features)
 - [Settings](#settings)
@@ -17,22 +19,37 @@ Send AI-generated birthday, anniversary, and occasion greetings via WhatsApp —
 
 ---
 
-## Quick Start (Mac / Windows / Linux)
+## Mac / Linux — one-line install
 
-No terminal needed. Just follow these four steps.
+Make sure [Docker Desktop](https://docs.docker.com/get-docker/) is installed and running, then paste this into a terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sedhasukhdeep/whatsapp_wishing_bot/master/install.sh | bash
+```
+
+The script will:
+1. Clone the repo to `~/wishing-bot`
+2. Ask for your AI API key and timezone
+3. Build and start the app in Docker
+4. Open `http://localhost:8080` in your browser automatically
+
+**To update to a new version**, run the same command again — your data and settings are preserved.
+
+> **Linux note:** if `docker compose` isn't found, install the [Docker Compose plugin](https://docs.docker.com/compose/install/).
+
+---
+
+## Manual setup (no terminal)
 
 ### Step 1 — Install Docker Desktop
-
-Docker Desktop is the software that runs Wishing Bot in the background. Install it once and you're done.
 
 | Your computer | Download |
 |---|---|
 | Mac — Apple Silicon (M1/M2/M3/M4) | [Docker.dmg (Apple chip)](https://desktop.docker.com/mac/main/arm64/Docker.dmg) |
 | Mac — Intel | [Docker.dmg (Intel chip)](https://desktop.docker.com/mac/main/amd64/Docker.dmg) |
-| Windows | [Docker Desktop Installer.exe](https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe) |
 | Linux | [Docker Desktop for Linux](https://docs.docker.com/desktop/install/linux-install/) |
 
-After installing, open Docker Desktop and wait until the taskbar or menu bar icon says **"Docker Desktop is running"**.
+After installing, open Docker Desktop and wait until the icon says **"Docker Desktop is running"**.
 
 ---
 
@@ -49,16 +66,18 @@ Open the unzipped folder and double-click:
 | Platform | File to double-click |
 |---|---|
 | Mac / Linux | `setup.command` |
-| Windows | `setup.bat` |
 
-The wizard will:
-1. Check that Docker is running
-2. Ask for your AI API key (e.g. Claude or OpenAI)
-3. Ask for your timezone
-4. Build and start the app
-5. Open it in your browser automatically
+The wizard will ask for your AI API key and timezone, then build and start the app.
 
 > **macOS tip:** If you see a security warning, right-click the file → **Open** → click **Open** again.
+
+---
+
+## Windows setup
+
+1. Install [Docker Desktop for Windows](https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe) and start it
+2. Download the ZIP from the green **Code** button above and unzip it
+3. Double-click `setup.bat` in the unzipped folder
 
 ---
 
