@@ -38,6 +38,7 @@ LENGTH_GUIDE = {"short": "~30 words", "medium": "~60 words", "long": "~100 words
 DEFAULT_CLAUDE_MODEL = "claude-3-5-haiku-20241022"
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 DEFAULT_GEMINI_MODEL = "gemini-2.0-flash"
+META_WA_DEFAULT_CHAT_ID = "13135550002@c.us"  # Meta AI's WhatsApp number (varies by region)
 
 
 def _get_effective_settings(db=None) -> dict:
@@ -53,6 +54,7 @@ def _get_effective_settings(db=None) -> dict:
             "openai_model": rows.get("openai_model") or env_settings.openai_model or DEFAULT_OPENAI_MODEL,
             "gemini_api_key": rows.get("gemini_api_key") or env_settings.gemini_api_key,
             "gemini_model": rows.get("gemini_model") or env_settings.gemini_model or DEFAULT_GEMINI_MODEL,
+            "meta_wa_chat_id": rows.get("meta_wa_chat_id") or env_settings.meta_wa_chat_id or META_WA_DEFAULT_CHAT_ID,
             "local_ai_url": rows.get("local_ai_url") or env_settings.local_ai_url,
             "local_ai_model": rows.get("local_ai_model") or env_settings.local_ai_model,
         }
@@ -64,6 +66,7 @@ def _get_effective_settings(db=None) -> dict:
         "openai_model": env_settings.openai_model or DEFAULT_OPENAI_MODEL,
         "gemini_api_key": env_settings.gemini_api_key,
         "gemini_model": env_settings.gemini_model or DEFAULT_GEMINI_MODEL,
+        "meta_wa_chat_id": env_settings.meta_wa_chat_id or META_WA_DEFAULT_CHAT_ID,
         "local_ai_url": env_settings.local_ai_url,
         "local_ai_model": env_settings.local_ai_model,
     }
@@ -173,6 +176,18 @@ async def _generate_gemini(prompt: str, api_key: str, model: str) -> str:
     )
     response = await gemini_model.generate_content_async(prompt)
     return _extract_clean_message(response.text.strip())
+
+
+async def _generate_meta_wa(prompt: str, meta_wa_chat_id: str, profile_id: int | None) -> str:
+    """Send a prompt to Meta AI via the WhatsApp chat and return its reply.
+
+    Requires the WhatsApp bridge to be running and the session connected.
+    The bridge sends the message to Meta AI's WA chat and waits for the reply.
+    """
+    from app.services.whatsapp_service import ask_meta_ai
+    if not profile_id:
+        raise RuntimeError("meta_wa provider requires a connected WhatsApp profile (profile_id must be set)")
+    return await ask_meta_ai(prompt, profile_id, meta_wa_chat_id)
 
 
 async def _generate_local(prompt: str, model: str, local_ai_url: str) -> str:
@@ -289,6 +304,9 @@ async def _call_provider(prompt: str, ai: dict) -> str:
 
     if provider == "gemini":
         return await _generate_gemini(prompt, ai["gemini_api_key"], ai["gemini_model"])
+
+    if provider == "meta_wa":
+        return await _generate_meta_wa(prompt, ai["meta_wa_chat_id"], ai.get("_profile_id"))
 
     if provider == "local":
         model = await _detect_local_model(ai["local_ai_url"], ai["local_ai_model"])
@@ -415,14 +433,21 @@ async def call_ai_raw(system_prompt: str, user_message: str, db=None, max_tokens
 
 
 async def generate_message(
-    contact: Contact, occasion: Occasion, on_date: date, db=None, extra_context: str | None = None
+    contact: Contact, occasion: Occasion, on_date: date, db=None, extra_context: str | None = None,
+    profile_id: int | None = None,
 ) -> tuple[str, str]:
     """Returns (generated_text, prompt_used).
 
     extra_context: optional free-text instructions appended to the prompt,
     e.g. from the WhatsApp admin command 'regenerate #3 make it funnier'.
+    profile_id: required when using the meta_wa provider (WhatsApp session context).
     """
     ai = _get_effective_settings(db)
+    # Pass profile_id so meta_wa provider can identify which WA session to use
+    if profile_id is not None:
+        ai["_profile_id"] = profile_id
+    elif contact and hasattr(contact, "profile_id"):
+        ai["_profile_id"] = contact.profile_id
     prompt = _build_prompt(contact, occasion, on_date, extra_context=extra_context)
     text = await _call_provider(prompt, ai)
     return text, prompt
@@ -463,5 +488,6 @@ async def get_ai_status(db=None) -> dict:
         "openai_model": ai["openai_model"],
         "gemini_configured": bool(ai["gemini_api_key"]),
         "gemini_model": ai["gemini_model"],
+        "meta_wa_chat_id": ai["meta_wa_chat_id"],
         "active_provider": active,
     }

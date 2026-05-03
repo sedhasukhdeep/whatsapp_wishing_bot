@@ -13,6 +13,7 @@ const contactsRouter = require('./routes/contacts');
 const messagesRouter = require('./routes/messages');
 const sessionsRouter = require('./routes/sessions');
 const adminRouter = require('./routes/admin');
+const askMetaAiRouter = require('./routes/ask_meta_ai');
 
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '127.0.0.1';
@@ -27,6 +28,7 @@ app.use(contactsRouter);
 app.use(messagesRouter);
 app.use(sessionsRouter);
 app.use(adminRouter);
+app.use(askMetaAiRouter);
 
 app.listen(PORT, HOST, () => {
   console.log(`[Bridge] Listening on http://${HOST}:${PORT}`);

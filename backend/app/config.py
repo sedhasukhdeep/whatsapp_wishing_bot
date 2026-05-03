@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     # Allowed frontend origin for CORS (set to your frontend URL in production/Docker)
     frontend_origin: str = "http://localhost:5173"
 
-    # AI provider: "auto" | "claude" | "openai" | "gemini" | "local"
+    # AI provider: "auto" | "claude" | "openai" | "gemini" | "meta" | "local"
     # "auto" tries local first then falls back to Claude
     ai_provider: str = "auto"
     local_ai_url: str = "http://localhost:1234/v1"   # LM Studio default
@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
+    # Meta AI via WhatsApp chat (no API key needed — uses the WA bridge)
+    meta_wa_chat_id: str = "13135550002@c.us"  # Meta AI's WhatsApp number (varies by region)
 
 
 settings = Settings()

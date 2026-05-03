@@ -12,6 +12,7 @@ class AISettingsUpdate(BaseModel):
     openai_model: Optional[str] = None
     gemini_api_key: Optional[str] = None
     gemini_model: Optional[str] = None
+    meta_wa_chat_id: Optional[str] = None
     local_ai_url: Optional[str] = None
     local_ai_model: Optional[str] = None
     giphy_api_key: Optional[str] = None
@@ -28,6 +29,7 @@ class AISettingsOut(BaseModel):
     openai_model: str
     gemini_api_key_masked: Optional[str]
     gemini_model: str
+    meta_wa_chat_id: str
     local_ai_url: str
     local_ai_model: str
     giphy_api_key_masked: Optional[str]
@@ -47,6 +49,7 @@ class AIStatusOut(BaseModel):
     openai_model: str
     gemini_configured: bool
     gemini_model: str
+    meta_wa_chat_id: str
     active_provider: str
 
 

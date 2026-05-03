@@ -43,6 +43,7 @@ def _build_settings_out(db: Session) -> AISettingsOut:
     openai_model = _get_setting(db, "openai_model") or env_settings.openai_model
     gemini_api_key = _get_setting(db, "gemini_api_key") or env_settings.gemini_api_key or None
     gemini_model = _get_setting(db, "gemini_model") or env_settings.gemini_model
+    meta_wa_chat_id = _get_setting(db, "meta_wa_chat_id") or env_settings.meta_wa_chat_id
     local_ai_url = _get_setting(db, "local_ai_url") or env_settings.local_ai_url
     local_ai_model = _get_setting(db, "local_ai_model") or env_settings.local_ai_model or ""
     giphy_api_key = _get_setting(db, "giphy_api_key")
@@ -57,6 +58,7 @@ def _build_settings_out(db: Session) -> AISettingsOut:
         openai_model=openai_model,
         gemini_api_key_masked=_mask_key(gemini_api_key),
         gemini_model=gemini_model,
+        meta_wa_chat_id=meta_wa_chat_id,
         local_ai_url=local_ai_url,
         local_ai_model=local_ai_model,
         giphy_api_key_masked=_mask_key(giphy_api_key),
@@ -85,6 +87,8 @@ def update_settings(body: AISettingsUpdate, db: Session = Depends(get_db)):
         _upsert(db, "gemini_api_key", body.gemini_api_key)
     if body.gemini_model is not None:
         _upsert(db, "gemini_model", body.gemini_model)
+    if body.meta_wa_chat_id is not None:
+        _upsert(db, "meta_wa_chat_id", body.meta_wa_chat_id)
     if body.local_ai_url is not None:
         _upsert(db, "local_ai_url", body.local_ai_url)
     if body.local_ai_model is not None:

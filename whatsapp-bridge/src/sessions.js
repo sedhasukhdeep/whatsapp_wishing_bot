@@ -14,6 +14,9 @@ const BOT_COMMANDS = ['list', 'approve', 'send', 'skip', 'regenerate', 'upcoming
 // SessionState: { client, isReady, currentQR, state }
 const sessions = new Map();
 
+// Map<profileId, { chatId, callback }> — one-shot listeners for Meta AI replies
+const metaListeners = new Map();
+
 async function _forwardToWebhook(msg, profileId) {
   if (!BACKEND_URL) return;
   const chatId = msg.id.remote;
@@ -101,7 +104,17 @@ function _createSession(profileId) {
     }, 5000);
   });
 
-  client.on('message', (msg) => _forwardToWebhook(msg, profileId));
+  client.on('message', (msg) => {
+    const fromId = msg.id.remote;
+    // Check if there's a pending Meta AI request for this profile + chat
+    const listener = metaListeners.get(profileId);
+    if (listener && fromId === listener.chatId) {
+      metaListeners.delete(profileId);
+      listener.callback(msg.body);
+      return; // Don't forward to webhook — this is a Meta AI response
+    }
+    _forwardToWebhook(msg, profileId);
+  });
   client.on('message_create', async (msg) => {
     if (!msg.fromMe) return;
     const firstWord = msg.body.trim().toLowerCase().split(/\s+/)[0];
@@ -206,6 +219,28 @@ async function getChatById(profileId, chatId) {
   return s.client.getChatById(chatId);
 }
 
+/**
+ * Send a raw message without the CHAT_ID_PATTERN validation (Meta AI uses a normal @c.us ID).
+ * Alias for internal use by ask_meta_ai route.
+ */
+async function sendMessageRaw(profileId, chatId, message) {
+  const s = sessions.get(profileId);
+  if (!s || !s.isReady) throw new Error('Client not ready');
+  return s.client.sendMessage(chatId, message);
+}
+
+/**
+ * Register a one-shot listener that resolves when the next message arrives
+ * from `chatId` in the given profile's session.
+ */
+function registerMetaListener(profileId, chatId, callback) {
+  metaListeners.set(profileId, { chatId, callback });
+}
+
+function unregisterMetaListener(profileId) {
+  metaListeners.delete(profileId);
+}
+
 module.exports = {
   SESSION_BASE,
   getStatus,
@@ -215,8 +250,11 @@ module.exports = {
   destroySession,
   destroyAll,
   sendMessage,
+  sendMessageRaw,
   sendGif,
   getContacts,
   getChats,
   getChatById,
+  registerMetaListener,
+  unregisterMetaListener,
 };

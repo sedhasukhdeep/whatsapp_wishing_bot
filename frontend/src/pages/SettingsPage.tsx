@@ -39,6 +39,7 @@ const AI_PROVIDERS = [
   { value: 'claude', label: 'Claude (Anthropic)' },
   { value: 'openai', label: 'OpenAI' },
   { value: 'gemini', label: 'Google Gemini' },
+  { value: 'meta_wa', label: 'Meta AI (via WhatsApp chat)' },
   { value: 'local', label: 'Local only (LM Studio / Ollama)' },
 ];
 
@@ -63,6 +64,7 @@ export default function SettingsPage() {
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [geminiModel, setGeminiModel] = useState('gemini-2.0-flash');
   const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [metaWaChatId, setMetaWaChatId] = useState('13135550002@c.us');
   const [localAiUrl, setLocalAiUrl] = useState('http://localhost:1234/v1');
   const [localAiModel, setLocalAiModel] = useState('');
 
@@ -89,6 +91,7 @@ export default function SettingsPage() {
         setClaudeModel(s.claude_model);
         setOpenaiModel(s.openai_model);
         setGeminiModel(s.gemini_model);
+        setMetaWaChatId(s.meta_wa_chat_id || '13135550002@c.us');
         setLocalAiUrl(s.local_ai_url);
         setLocalAiModel(s.local_ai_model);
       })
@@ -133,6 +136,7 @@ export default function SettingsPage() {
         openai_model: openaiModel,
         gemini_api_key: geminiApiKey !== '' ? geminiApiKey : null,
         gemini_model: geminiModel,
+        meta_wa_chat_id: metaWaChatId,
         local_ai_url: localAiUrl,
         local_ai_model: localAiModel,
         giphy_api_key: giphyKey !== '' ? giphyKey : null,
@@ -233,6 +237,11 @@ export default function SettingsPage() {
                 label="Gemini"
                 value={status.gemini_configured ? `Configured — ${status.gemini_model}` : 'No API key'}
                 ok={status.gemini_configured}
+              />
+              <StatusRow
+                label="Meta AI (WhatsApp)"
+                value={status.meta_wa_chat_id ? `Chat ID: ${status.meta_wa_chat_id}` : 'Not configured'}
+                ok={!!status.meta_wa_chat_id}
               />
               <StatusRow
                 label="Local AI"
@@ -412,6 +421,27 @@ export default function SettingsPage() {
                 </Select>
               </Field>
             </>
+          )}
+
+          <div className="border-t pt-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">Meta AI (via WhatsApp)</p>
+          </div>
+
+          <Field
+            label="Meta AI Chat ID"
+            description="WhatsApp chat ID for Meta AI. Find it by opening the Meta AI chat in WhatsApp — it's listed as a contact. Default is the US number 13135550002@c.us."
+          >
+            <Input
+              value={metaWaChatId}
+              onChange={(e) => setMetaWaChatId(e.target.value)}
+              placeholder="13135550002@c.us"
+              className="font-mono text-sm"
+            />
+          </Field>
+          {aiProvider === 'meta_wa' && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded px-3 py-2">
+              Meta AI via WhatsApp sends your prompts to the Meta AI chat and waits for the reply. WhatsApp must be connected and the Meta AI contact must be available in your region.
+            </p>
           )}
 
           <div className="border-t pt-4">

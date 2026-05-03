@@ -169,6 +169,29 @@ async def restart_bridge_session(profile_id: int) -> dict:
         raise HTTPException(status_code=502, detail=f"WhatsApp bridge error: {e}") from e
 
 
+async def ask_meta_ai(prompt: str, profile_id: int, chat_id: str, timeout_ms: int = 45000) -> str:
+    """Send a prompt to Meta AI's WhatsApp chat and return the response text.
+
+    The bridge sends the message and waits for Meta AI's reply (up to timeout_ms).
+    """
+    try:
+        async with httpx.AsyncClient(timeout=timeout_ms / 1000 + 10) as client:
+            resp = await client.post(
+                f"{settings.wa_bridge_url}/ask-meta-ai",
+                json={"profile_id": profile_id, "chat_id": chat_id, "prompt": prompt, "timeout_ms": timeout_ms},
+            )
+            if resp.status_code == 503:
+                _503()
+            if resp.status_code == 504:
+                raise RuntimeError("Meta AI did not respond in time — try again or switch to another provider")
+            resp.raise_for_status()
+            return resp.json()["text"]
+    except HTTPException:
+        raise
+    except httpx.HTTPError as e:
+        raise RuntimeError(f"Meta AI via WhatsApp failed: {e}") from e
+
+
 async def restart_bridge() -> dict:
     """Tell the bridge process to exit so Docker restarts it."""
     try:
