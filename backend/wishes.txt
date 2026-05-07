@@ -2,93 +2,429 @@
 # Offline Wish Bank — wishing_bot
 #
 # FORMAT:
-#   [occasion_type]   — starts a new template (birthday | anniversary | custom)
+#   [occasion_type]   — starts a new template
 #   {name}            — contact's display name (alias if set, else full name)
-#   {partner_name}    — partner's name (anniversaries; blank if not set)
+#   {partner_name}    — partner's name (anniversaries; omitted if not set)
 #   {relationship}    — e.g. "Friend", "Cousin", "Uncle"
 #   {occasion_label}  — e.g. "Birthday", "Anniversary", "Work Anniversary"
+#
+# Tags:
+#   [birthday]            — birthday wishes
+#   [anniversary]         — wedding/relationship anniversary
+#   [custom:work]         — work anniversary / promotion
+#   [custom:baby]         — new baby / newborn
+#   [custom:graduation]   — graduation
+#   [custom:get_well]     — get well soon
+#   [custom]              — general fallback (uses {occasion_label})
 #
 # Rules:
 #   • Lines starting with # are comments — ignored at runtime
 #   • A blank line between templates is fine; the [tag] line starts each one
-#   • Add as many templates as you like under each tag — one is picked randomly
-#   • For anniversaries without a partner_name, {partner_name} is omitted
+#   • Add as many templates as you like — one is picked at random
+#   • For anniversaries without a partner_name, {partner_name} is removed
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-# ── BIRTHDAY ─────────────────────────────────────────────────────────────────
+# ── BIRTHDAY — SHORT ─────────────────────────────────────────────────────────
 
 [birthday]
-Happy Birthday {name}! 🎂 Wishing you a day as wonderful as you are. Hope it's filled with love, laughter, and everything you deserve. Have an amazing one! 🎉
+Happy birthday {name}! 🎉 Wishing you a day filled with joy, laughter, and all your favourite things.
 
 [birthday]
-Many happy returns of the day, {name}! 🎈 May this birthday bring you joy, good health, and all the happiness in the world. Celebrating you today!
+{name}, another year older, another year wiser! Have an amazing birthday 🎂
 
 [birthday]
-Wishing you a very Happy Birthday, {name}! 🎂 Hope your special day is surrounded by the people you love and all the things that make you smile. Enjoy every moment! ✨
+Happy birthday to {name}! Hope your day is as special as you are ✨
 
 [birthday]
-Happy Birthday {name}! 🥳 Another year older, another year wiser — though you never seem to age! Hope today is as special as you are. Lots of love! 🎁
+Wishing you the happiest of birthdays, {name}! Enjoy every moment 🎈
 
 [birthday]
-Sending you warm birthday wishes, {name}! 🎉 May this new year of your life be your best one yet, filled with wonderful memories and beautiful moments.
+{name}, it's your special day! Celebrate you and all the wonderful things you bring to the world 🌟
 
 [birthday]
-Happy Birthday {name}! 🌟 Birthdays come and go, but the warmth you bring to everyone around you stays forever. Here's to celebrating you today! 🎂
+Happy birthday, {name}! May this year bring you endless happiness and success 🎊
 
 [birthday]
-Hope your birthday is absolutely fabulous, {name}! 🎈 Wishing you great health, lots of happiness, and a year ahead full of exciting adventures. Enjoy your day!
+Another trip around the sun! Happy birthday {name}, make it count! ☀️
 
 [birthday]
-To a wonderful {relationship} — Happy Birthday {name}! 🎂 Today is all about you, so make it count. Wishing you every happiness today and always. 💐
+Cheers to you, {name}! Wishing you a birthday as bright as your smile 😊
 
 [birthday]
-Happy Birthday {name}! 🥂 May your day be filled with smiles, surprises, and all your favourite things. Here's to you and many more wonderful years ahead!
+{name}, you deserve the best birthday ever. Here's to you today! 🎁
 
 [birthday]
-Warmest birthday wishes to you, {name}! 🌸 May the year ahead be full of new beginnings, beautiful moments, and endless blessings. Have a truly special day! 🎉
+Happy birthday to someone truly special. Have the most wonderful day, {name}! 💫
 
 
-# ── ANNIVERSARY ──────────────────────────────────────────────────────────────
+# ── BIRTHDAY — MEDIUM ────────────────────────────────────────────────────────
+
+[birthday]
+{name}, here's to another year of making incredible memories, pursuing your dreams, and enjoying life to the fullest. Happy birthday! May every moment of your day be filled with laughter, surrounded by the people who love you most.
+
+[birthday]
+On your special day, {name}, I want to celebrate everything that makes you amazing — your kindness, your spirit, and your ability to light up every room. Here's to a birthday as wonderful as you are, and a year filled with adventures and joy.
+
+[birthday]
+Happy birthday {name}! As you celebrate today, remember how much you're appreciated. You've brought so much happiness to those around you, and this year will bring you even more blessings, success, and unforgettable moments.
+
+[birthday]
+{name}, another year of your amazing journey! I'm grateful for your friendship and all the laughs we've shared. May your birthday be the start of your best year yet, full of growth, love, and endless possibilities.
+
+[birthday]
+To {name} on your birthday: you deserve every happiness that comes your way. Celebrate yourself today, because you truly are one of a kind. Here's to new adventures, new memories, and a year of becoming your best self.
+
+[birthday]
+{name}, as you turn another year older, know that you're getting better with age. Your wisdom, your warmth, and your strength inspire everyone around you. Wishing you a birthday filled with love, laughter, and all the good things you deserve.
+
+[birthday]
+Happy birthday to {name}, someone who makes the world brighter just by being in it. This year, may you achieve all your goals, create beautiful memories, and experience the kind of happiness that lasts long after the candles are blown out.
+
+[birthday]
+{name}, your birthday is the perfect time to reflect on all you've accomplished and all that lies ahead. You're capable of amazing things, and this year will prove it. Celebrate yourself today — you've earned it! 🎂
+
+[birthday]
+On this special day, {name}, I celebrate you and everything you bring to life. Your authenticity, your courage, and your beautiful heart matter more than you know. Here's to a year of chasing dreams and living your best life.
+
+[birthday]
+{name}, happy birthday! As you step into another year, know that you're surrounded by people who believe in you. May this year bring you closer to your dreams, fill your heart with joy, and remind you just how special you truly are.
+
+
+# ── BIRTHDAY — LONG ──────────────────────────────────────────────────────────
+
+[birthday]
+{name}, happy birthday! I hope today is the kind of day where everything just feels right — surrounded by people you love, doing things that make you smile, and feeling the warmth of how much you mean to everyone around you. You've made such an impact on the lives of people who know you, and this birthday is a celebration not just of another year, but of the wonderful person you've grown into. Here's to your health, your happiness, and a future full of beautiful possibilities. Many happy returns! 🎂🎉
+
+[birthday]
+Happy birthday, {name}! Another year has passed, and with it comes the chance to celebrate everything you are — your resilience, your laughter, your incredible spirit. Life is better because you're in it. As you blow out those candles, know that your wishes matter and your dreams are worth chasing. May this year bring you everything your heart desires: success, peace, love, and memories that will warm you for years to come. You deserve the absolute best. 🌟
+
+[birthday]
+{name}, today we celebrate you — not just the day you were born, but every moment since that has shaped the remarkable person you are today. Your journey has had its challenges, but you've faced them all with grace and courage. As you mark another year, I want you to know just how deeply appreciated and loved you are. May the year ahead be one of breakthroughs, joy, and the sweet satisfaction of your efforts finally paying off. Happy birthday! 🎈
+
+[birthday]
+Dear {name}, birthdays are a beautiful reminder of just how precious life is, and yours gives us all a reason to pause and be grateful for you. From the very first moment you came into our lives, you've brought light and joy with you. This birthday, I wish you the kind of deep, lasting happiness that money can't buy — meaningful relationships, inner peace, a heart full of gratitude, and the courage to always be authentically you. Here's to another magnificent year! 🌸
+
+[birthday]
+{name}, as you celebrate your birthday today, I hope you take a moment to look back and truly appreciate how far you've come. Every struggle you've endured, every smile you've shared, every moment of courage — it has all brought you to exactly where you need to be. The world is genuinely better for having you in it. As you move into this next year of life, may you be filled with clarity, purpose, and the confidence to go after everything you want. You've got this. Happy birthday! 🚀
+
+[birthday]
+Happy birthday, {name}! I wanted to take a moment to tell you something important: you are irreplaceable. The world would be a much quieter, less colourful place without your presence in it. Your laugh, your generosity, the way you show up for people — all of it matters more than you know. As you celebrate today, I hope you feel every ounce of love and admiration that surrounds you. May your year ahead be filled with moments that take your breath away and memories that make you smile for years to come. 💕
+
+[birthday]
+{name}, today is your day and I want to make sure you feel every bit as special as you truly are. Throughout the years, you've shown strength I admire, kindness that inspires, and a sense of humour that always brightens the room. Birthdays like yours deserve grand celebrations — but more than the cake and festivities, I hope you feel a deep sense of peace and pride in who you've become. May the year ahead be your most fulfilling yet, and may every morning bring you something to look forward to. Happy birthday! 🎊
+
+[birthday]
+{name}, another year older — and we're all so glad you are! You've been a constant source of warmth, wisdom, and laughter, and your presence genuinely enriches every space you walk into. As you celebrate today, I hope you're able to set aside any worries and simply enjoy the beautiful reality that you are loved, valued, and celebrated. May this birthday mark the beginning of an extraordinary chapter — one filled with opportunities, joy, and all the things you've been hoping for. Wishing you the happiest of days! 🌈
+
+[birthday]
+Happy birthday to {name}, who has consistently shown us all what it means to live with heart. You approach life with a rare combination of passion and kindness, and the people around you are so much better for it. This birthday, I'm not just celebrating the day you were born — I'm celebrating every experience, every lesson, and every choice that has made you the incredible person you are. May this year bring you the recognition you deserve, the rest you need, and the joy that's always been yours to claim. 🎂
+
+[birthday]
+{name}, happy birthday from the bottom of my heart! Life has a funny way of flying by, but I never want a birthday to pass without making sure you know how truly cherished you are. You've touched lives, lifted spirits, and made ordinary moments feel extraordinary. As you step into this new year of life, may you do so with your head held high, your heart wide open, and a spirit ready for all the incredible things coming your way. You are loved — today and always. Many happy returns! 💝
+
+
+# ── BIRTHDAY — FUNNY / PLAYFUL ───────────────────────────────────────────────
+
+[birthday]
+Happy birthday {name}! 😄 Congrats on surviving another year, you absolute legend! May your day be filled with cake, laughter, and zero adult responsibilities.
+
+[birthday]
+{name}, you're not old, you're retro! Happy birthday to someone who gets better with age — like fine wine. Or cheese. Either way, you're delightful! 🧀
+
+[birthday]
+Happy birthday {name}! May all your wishes come true, and may you have enough cake to make that possible. Here's to getting another year wiser... or at least another year older! 🎉
+
+[birthday]
+{name}, another year around the sun and you still haven't figured out how to act your age. Keep it up! Happy birthday, you legend! 🎊
+
+[birthday]
+Happy birthday to {name}! You're not getting older, you're becoming a limited edition. Celebrate that! 👑
+
+[birthday]
+{name}, on your birthday, I'm celebrating the fact that you're getting older but still cooler than me. Happy birthday, friend! 😎
+
+[birthday]
+Happy birthday {name}! May your birthday be as fun as we are and as wild as we pretend to be when no one's watching! 🎈
+
+[birthday]
+{name}, it's your birthday! Time to eat cake, act ridiculous, and pretend we're not all getting older. Let's do this! 🍰
+
+
+# ── BIRTHDAY — FORMAL / RESPECTFUL ───────────────────────────────────────────
+
+[birthday]
+Dear {name}, on your special day, I wish you abundant blessings, good health, and happiness. May this year bring you success in all you do and fulfilment in your heart. Warmest wishes on your birthday.
+
+[birthday]
+{name}, as you celebrate another year of life, I want to express my sincere wishes for your continued well-being and prosperity. May this birthday mark the beginning of an extraordinary year filled with achievements and cherished moments.
+
+[birthday]
+Happy birthday {name}. It is with great pleasure that I extend my warmest wishes to you on this significant day. May you continue to grow in wisdom and grace, and may your life be blessed with joy and contentment.
+
+[birthday]
+To {name}, my warmest congratulations on your birthday. As you celebrate another year, may you be reminded of the positive impact you have on those around you and the wonderful person you are.
+
+[birthday]
+{name}, on your birthday, I wish you renewed energy, continued success, and lasting happiness. May this year be marked by good health, cherished relationships, and the fulfilment of your aspirations.
+
+
+# ── BIRTHDAY — RELIGIOUS / SPIRITUAL ─────────────────────────────────────────
+
+[birthday]
+May Allah bless you abundantly, {name}, on your special day. Wishing you a birthday filled with joy, surrounded by loved ones, and a year ahead full of His mercy and blessings. Happy birthday! 🤲
+
+[birthday]
+On your birthday {name}, I pray that God showers you with His grace and blessings. May this year bring you peace, prosperity, and the wisdom to navigate life with faith and purpose.
+
+[birthday]
+{name}, as you celebrate another year, may the Almighty bless your journey ahead. Happy birthday! I wish you a year of spiritual growth, inner peace, and abundant happiness. 🌙✨
+
+[birthday]
+{name}, may God bless you with a heart full of joy, a mind full of wisdom, and a year full of His infinite blessings and mercies. Happy birthday! 🎂
+
+[birthday]
+{name}, on this blessed day, may God grant you health, happiness, and success. May your life be filled with purpose and your heart with gratitude. Happy birthday! 🙏
+
+
+# ── BIRTHDAY — POETIC ────────────────────────────────────────────────────────
+
+[birthday]
+{name}, on your birthday, I celebrate the verses of your life — each year a beautiful line in the poem of your existence. May this chapter be your greatest yet, written with joy and coloured with wonder. ✨
+
+[birthday]
+{name}, like the seasons changing, you bring new growth and beauty to the world with every year. May your birthday be a moment to reflect on how far you've come and anticipate the magic still to come.
+
+[birthday]
+{name}, you are a masterpiece still being painted. Each year adds another brushstroke of wisdom, kindness, and grace. Happy birthday to someone truly extraordinary. 🎨
+
+[birthday]
+{name}, in the garden of life, you are a bloom that brings colour and fragrance to those around you. On your birthday, may you be reminded of your beauty and worth. Here's to another year of flourishing. 🌸
+
+[birthday]
+{name}, like the stars that guide us home, you light the way for those fortunate enough to know you. May your birthday shine as brightly as your spirit, and may the year ahead be filled with wonder. 🌟
+
+
+# ── ANNIVERSARY — SHORT ──────────────────────────────────────────────────────
 
 [anniversary]
-Happy Anniversary {name} and {partner_name}! 💕 Wishing you both a day filled with love and beautiful memories. Here's to many more wonderful years together! 🥂
+Happy anniversary {name} and {partner_name}! Here's to love, laughter, and forever 💕
 
 [anniversary]
-Warmest congratulations on your anniversary, {name} and {partner_name}! 🌹 May your love continue to grow stronger with each passing year. You two are truly special together!
+Wishing you both a beautiful anniversary! Your love story is truly inspiring 💑
 
 [anniversary]
-Happy Anniversary! 💍 Wishing {name} and {partner_name} a lifetime of love, laughter, and happiness. May this day remind you of everything that makes your bond so beautiful. ❤️
+Happy anniversary! May your love continue to grow stronger with each passing year ✨
 
 [anniversary]
-Congratulations on another beautiful year together, {name} and {partner_name}! 🌷 Your love is an inspiration to everyone around you. Wishing you endless joy and togetherness! 💑
+To a couple that truly has it all — happy anniversary {name} and {partner_name}! 🎉
 
 [anniversary]
-Happy Anniversary {name} and {partner_name}! 🎊 May your love story continue to be filled with joy, adventure, and deep affection for years and years to come. Celebrate big today! 🥂
+Celebrating the love between you two! Happy anniversary, you beautiful souls 💫
 
 [anniversary]
-Sending lots of love on your anniversary, {name} and {partner_name}! 💞 May each year bring you closer and make your bond even stronger. You two are goals! 🌟
+{name} and {partner_name}, wishing you an anniversary as special as your love for each other 💜
 
 [anniversary]
-Many congratulations on your anniversary! 💐 Wishing {name} and {partner_name} a day as lovely as the love you share. Here's to forever together!
+Happy anniversary! Here's to the best decision you both ever made — choosing each other 💍
+
+
+# ── ANNIVERSARY — MEDIUM ─────────────────────────────────────────────────────
 
 [anniversary]
-Happy Anniversary to a wonderful couple! 🌹 {name} and {partner_name}, may your love keep flourishing and your happiness know no bounds. Celebrating you both today! 💕
+{name} and {partner_name}, another year of making memories together. Happy anniversary to two wonderful people! 🌹 May this year bring you even closer and fill your days with the joy you've always given each other.
+
+[anniversary]
+Wishing you both an anniversary filled with joy, laughter, and all the love that makes you two so special. {name} and {partner_name}, your bond is something truly rare and beautiful. 💕
+
+[anniversary]
+{name} and {partner_name}, it's been wonderful watching your love grow over the years. Here's to another amazing year together. Happy anniversary to a couple who truly brings out the best in each other!
+
+[anniversary]
+Happy anniversary to two people who prove that true love really does exist. Wishing you both endless happiness, adventure, and the kind of love that inspires everyone around you. May this year be even more beautiful than the last. 🌹
+
+[anniversary]
+To {name} and {partner_name}, congratulations on another year of choosing each other, building memories, and creating a love that shines bright. Your partnership is a testament to commitment and genuine care. 💍
+
+[anniversary]
+{name} and {partner_name}, as you celebrate another year together, I'm reminded of how lucky you both are to have found each other. Your love story is one of warmth, laughter, and true connection. Here's to many more years of making beautiful memories!
+
+[anniversary]
+Happy anniversary to the couple who reminds us all what love should look like. {name} and {partner_name}, you've built something truly special together. May this next year bring you closer and fill your days with the joy you so deserve. 💕
 
 
-# ── CUSTOM / GENERAL ─────────────────────────────────────────────────────────
+# ── ANNIVERSARY — LONG ───────────────────────────────────────────────────────
+
+[anniversary]
+{name} and {partner_name}, as you mark another year together, I want to take a moment to celebrate not just the milestone, but the every day of your relationship — the ordinary moments that become extraordinary because you share them. The way you support each other, laugh together, and grow side by side is a testament to something truly beautiful. May this anniversary remind you of the depth of your bond and the strength of the love you've built. Wishing you both a lifetime of happiness and countless more anniversaries. 💕
+
+[anniversary]
+Happy anniversary, {name} and {partner_name}! The love you share is a source of warmth and inspiration for everyone who knows you. You've built something genuinely special together — a partnership rooted in respect, friendship, and deep affection. As you celebrate today, I hope you feel the gratitude and admiration of everyone around you. May the years ahead bring you continued growth, shared adventures, and the kind of contentment that only comes from truly finding your person. Here's to forever! 💍
+
+[anniversary]
+{name} and {partner_name}, what a journey it has been! Every year you spend together adds a new, beautiful chapter to your love story. Through all the seasons of life — the joys and the challenges — you've stood by each other with grace and unwavering support. That is something to be deeply proud of. On your anniversary, I celebrate not just the time you've shared, but the future you're still building together. May it be filled with laughter, health, and endless love. Happy anniversary! 🌹
+
+[anniversary]
+To {name} and {partner_name}, thank you for showing us what partnership truly means. Happy anniversary to two remarkable people who have created something lasting and beautiful. The love you carry for each other is evident in everything you do — the small kindnesses, the shared laughter, the quiet moments of understanding. Wishing you both a year filled with adventure, tenderness, and endless love. Here's to the beautiful life you've created together! 💑
+
+[anniversary]
+{name} and {partner_name}, your love story is one for the ages. Not because it's without its challenges — all great love stories have those — but because you've faced every one of them together, emerging stronger and more united than before. That kind of love is rare and precious, and it deserves to be celebrated wholeheartedly. Happy anniversary! May the years ahead be filled with everything your hearts desire, and may your love continue to deepen with every passing day. We're so lucky to know you both. 🌸
+
+[anniversary]
+Happy anniversary to {name} and {partner_name}! Marriage is a journey unlike any other — full of growth, compromise, joy, and profound connection. You two have navigated it beautifully, with love and grace at every turn. As you celebrate this milestone, I hope you take a moment to truly appreciate what you've built: a life of meaning, a home of warmth, and a love that only grows stronger with time. Here's to many more years of this beautiful journey together. Congratulations! 💝
+
+
+# ── ANNIVERSARY — PLAYFUL ────────────────────────────────────────────────────
+
+[anniversary]
+{name} and {partner_name}, happy anniversary! You two are absolutely hilarious together — here's to another year of laughs, inside jokes, and loving each other through the chaos. You're a dream team! 😄
+
+[anniversary]
+Happy anniversary to the couple who actually likes each other! {name} and {partner_name}, you're goals. Keep being adorable together 💕
+
+[anniversary]
+{name} and {partner_name}, another year of putting up with each other — and somehow loving it! Congrats on not driving each other crazy. Happy anniversary! 😂
+
+[anniversary]
+{name} and {partner_name}, anniversary wishes to the couple who laughs together, cries together, and somehow makes it all work. You're amazing together! 🎉
+
+[anniversary]
+Happy anniversary {name} and {partner_name}! So glad you two found each other. You're couple goals — the real, messy, wonderful kind! 💑
+
+
+# ── ANNIVERSARY — RELIGIOUS / SPIRITUAL ──────────────────────────────────────
+
+[anniversary]
+To {name} and {partner_name}, on your anniversary, may you be blessed with abundance, health, and the kind of love that deepens with each passing year. Your partnership is a testament to faith and commitment. Happy anniversary.
+
+[anniversary]
+{name} and {partner_name}, as you celebrate this special day, may God bless your marriage and fill your hearts with gratitude for each other. Wishing you both happiness and harmony in the year ahead.
+
+[anniversary]
+Happy anniversary to {name} and {partner_name}! May Allah bless your union and grant you both a lifetime of love, peace, and companionship. 🤲
+
+[anniversary]
+{name} and {partner_name}, may your marriage continue to be blessed with God's grace and love. Happy anniversary to a couple truly meant to be together! 🙏
+
+
+# ── WORK ANNIVERSARY / PROMOTION ─────────────────────────────────────────────
+
+[custom:work]
+Happy work anniversary {name}! Celebrating the amazing contributions you've made and the growth you've shown. Here's to many more years of success! 🌟
+
+[custom:work]
+Congratulations on your work anniversary, {name}! You're an absolute asset to the team. Wishing you continued growth and success in all you do 🎉
+
+[custom:work]
+{name}, it's your work anniversary! Your dedication, hard work, and positive attitude make all the difference. Looking forward to many more years ahead! 💪
+
+[custom:work]
+We're so grateful for everything you bring, {name}. Happy work anniversary! Here's to celebrating your journey and the incredible impact you've made. 🏆
+
+[custom:work]
+Congratulations {name} on the promotion! Your hard work and talent have truly paid off. Wishing you all the best as you step into this exciting new role. You've got this! 🚀
+
+[custom:work]
+{name}, you earned this promotion and you deserve it! So proud of your growth and achievement. Here's to new challenges, bigger wins, and continued success. 🎊
+
+[custom:work]
+{name}, your dedication has opened incredible doors. Congratulations on the promotion! We can't wait to see all the amazing things you'll accomplish in this exciting new chapter. 💫
+
+[custom:work]
+{name}, congratulations on your well-deserved promotion! Your hard work, brilliant ideas, and amazing attitude have brought you here. Wishing you success and fulfilment in this new role. We've got your back! 🌟
+
+
+# ── NEW BABY ──────────────────────────────────────────────────────────────────
+
+[custom:baby]
+Congratulations on the arrival of your beautiful baby! Wishing you all the love, joy, and wonderful memories that come with being parents. This is just the beginning of an incredible journey! 👶💕
+
+[custom:baby]
+A new little one has arrived! Congratulations {name} on the birth of your baby. Wishing you and your growing family health, happiness, and endless love. 🎉
+
+[custom:baby]
+Welcome to parenthood, {name}! What a beautiful blessing. Wishing you sweet moments, restful nights, and all the love that comes with your precious new addition. 💫
+
+[custom:baby]
+Congratulations on your new baby! May this beautiful child bring you boundless joy, laughter, and love. Wishing you strength, patience, and the most wonderful parenting journey ahead! 👼
+
+[custom:baby]
+A new life, a new love. Congratulations {name} on the arrival of your bundle of joy! Wishing your family health, happiness, and a lifetime of beautiful moments together. 🌟
+
+[custom:baby]
+{name}, what wonderful news! Congratulations on your beautiful new baby. May your home be filled with laughter, your heart with gratitude, and your days with the incredible joy that only a child can bring. Welcome to the world, little one! 💕
+
+
+# ── GRADUATION ────────────────────────────────────────────────────────────────
+
+[custom:graduation]
+Congratulations on your graduation, {name}! You've worked hard and it's paid off. Here's to new adventures, endless possibilities, and all the amazing things you'll achieve! 🎓
+
+[custom:graduation]
+{name}, you did it! Happy graduation! You should be so proud of yourself. Can't wait to see where life takes you next! 🌟
+
+[custom:graduation]
+Congratulations {name} on graduating! You've accomplished something incredible. Wishing you success and happiness as you embark on this exciting new chapter! 🎉
+
+[custom:graduation]
+Happy graduation, {name}! This is just the beginning of an extraordinary journey. We're so proud of you and can't wait to see all the amazing things you'll do! 🚀
+
+[custom:graduation]
+{name}, you're officially a graduate! What an achievement! Wishing you confidence, courage, and endless opportunities as you step into this new phase of your life. The world is yours! 💫
+
+[custom:graduation]
+Congratulations on your graduation, {name}! You've worked so hard to get here. Now go out there and make your mark — we believe in you completely! 🎓✨
+
+
+# ── GET WELL SOON ─────────────────────────────────────────────────────────────
+
+[custom:get_well]
+Wishing you a speedy recovery, {name}! Take care of yourself and know that you're in our thoughts. Get well soon! 💙
+
+[custom:get_well]
+Sending healing thoughts your way, {name}. Get well soon! We miss you and can't wait to see you back to your amazing self. 🌟
+
+[custom:get_well]
+{name}, we're all rooting for your quick recovery! Take the time you need to rest and heal — we'll be here for you every step of the way. Get well soon! 💪
+
+[custom:get_well]
+Thinking of you during this time, {name}. Sending love and positive energy your way. Here's to a speedy recovery and feeling better very soon! 💕
+
+[custom:get_well]
+{name}, we're sending all our good wishes your way. Take care of yourself, rest well, and know that you're loved and missed. Get well soon! ❤️
+
+[custom:get_well]
+Wishing you strength and good health, {name}. This is just a bump in the road, and we know you'll bounce back soon. Rest well and recover quickly! 🌈
+
+
+# ── GENERAL / FALLBACK ───────────────────────────────────────────────────────
 
 [custom]
-Warmest wishes to you on this special occasion, {name}! 🌟 Hope this day brings you all the joy and happiness you truly deserve. Thinking of you! 💐
+Celebrating you today, {name}! On this {occasion_label}, I wanted to take a moment to express how much you mean to me. Wishing you all the joy and happiness your heart can hold! 🌟
 
 [custom]
-Sending you lots of love and warm wishes, {name}! 🎉 May this {occasion_label} be everything you hoped for and more. Celebrate well! ✨
+{name}, on your {occasion_label}, I'm reminded of all the reasons you're so special. Here's to celebrating you and everything that makes this day meaningful. Enjoy every moment! 💫
 
 [custom]
-Congratulations and best wishes, {name}! 🥂 Here's to making wonderful memories on this special day. Wishing you all the best always!
+Happy {occasion_label}, {name}! This is your day to shine and be celebrated. Wishing you joy, laughter, and all the good things you deserve! 🎉
 
 [custom]
-Thinking of you on this special occasion, {name}! 🌸 Hope it's a truly wonderful day surrounded by the people you love. Warm wishes always! 💫
+{name}, as you celebrate this {occasion_label}, know that you're appreciated and loved. Here's to making today absolutely unforgettable! 💕
 
 [custom]
-Many warm wishes to you, {name}! 🎊 May this {occasion_label} bring you happiness, health, and everything you've been looking forward to. Enjoy every moment! 🌟
+{name}, your {occasion_label} is the perfect time to celebrate everything that makes you awesome. Wishing you a day filled with happiness and cherished moments! ✨
+
+[custom]
+Celebrating {name} on this special {occasion_label}! You deserve a day as wonderful as you are. Here's to joy, love, and making beautiful memories! 🌈
+
+[custom]
+{name}, on your {occasion_label}, I wish you happiness, peace, and all the blessings life has to offer. You're truly special and deserve the very best! 💫
+
+[custom]
+{name}, this {occasion_label} is all about celebrating you! Wishing you a day full of smiles, surrounded by people who love and appreciate you. Enjoy every second! 🎊
+
+[custom]
+Happy {occasion_label}, {name}! Here's to celebrating what makes today special for you and wishing you a year ahead full of growth, joy, and amazing possibilities! 🚀
+
+[custom]
+{name}, on this {occasion_label}, I'm grateful for you and all the ways you make life better. Wishing you a day as incredible as you are! 💝
