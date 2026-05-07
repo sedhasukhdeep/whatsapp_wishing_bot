@@ -35,12 +35,13 @@ const GEMINI_MODELS = [
 ];
 
 const AI_PROVIDERS = [
-  { value: 'auto', label: 'Auto (local first, fall back to Claude)' },
+  { value: 'auto', label: 'Auto (local → cloud → offline fallback)' },
   { value: 'claude', label: 'Claude (Anthropic)' },
   { value: 'openai', label: 'OpenAI' },
   { value: 'gemini', label: 'Google Gemini' },
   { value: 'meta_wa', label: 'Meta AI (via WhatsApp chat)' },
   { value: 'local', label: 'Local only (LM Studio / Ollama)' },
+  { value: 'offline', label: 'Offline wish bank (no AI — uses wishes.txt)' },
 ];
 
 export default function SettingsPage() {
@@ -261,7 +262,7 @@ export default function SettingsPage() {
           <CardTitle className="text-sm font-medium">AI Configuration</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          <Field label="AI Provider" description="Which AI backend to use for generating messages.">
+          <Field label="AI Provider" description="Which AI backend to use for generating messages. In Auto mode, all AI providers are tried in order, then offline wish bank is used as final fallback.">
             <Select value={aiProvider} onValueChange={setAiProvider}>
               <SelectTrigger>
                 <SelectValue />
@@ -275,6 +276,21 @@ export default function SettingsPage() {
               </SelectContent>
             </Select>
           </Field>
+
+          {aiProvider === 'offline' && (
+            <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+              <p className="font-semibold mb-1">📖 Offline Wish Bank active</p>
+              <p>Messages will be picked from <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">wishes.txt</code> in the backend folder — no AI calls made. Edit that file to customise templates.</p>
+              <p className="mt-1 text-xs opacity-75">Supports variables: <code className="font-mono">{'{name}'}</code>, <code className="font-mono">{'{partner_name}'}</code>, <code className="font-mono">{'{relationship}'}</code>, <code className="font-mono">{'{occasion_label}'}</code></p>
+            </div>
+          )}
+
+          {aiProvider === 'auto' && (
+            <div className="rounded-md bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 px-4 py-3 text-sm text-blue-800 dark:text-blue-300">
+              <p className="font-semibold mb-1">ℹ️ Auto mode</p>
+              <p>Tries: Local LLM → Claude → OpenAI → Gemini → Offline wish bank (as final fallback if all AI providers fail).</p>
+            </div>
+          )}
 
           <div className="border-t pt-4">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">Claude (Anthropic)</p>

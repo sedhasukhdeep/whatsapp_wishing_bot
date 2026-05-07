@@ -1,0 +1,94 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Offline Wish Bank — wishing_bot
+#
+# FORMAT:
+#   [occasion_type]   — starts a new template (birthday | anniversary | custom)
+#   {name}            — contact's display name (alias if set, else full name)
+#   {partner_name}    — partner's name (anniversaries; blank if not set)
+#   {relationship}    — e.g. "Friend", "Cousin", "Uncle"
+#   {occasion_label}  — e.g. "Birthday", "Anniversary", "Work Anniversary"
+#
+# Rules:
+#   • Lines starting with # are comments — ignored at runtime
+#   • A blank line between templates is fine; the [tag] line starts each one
+#   • Add as many templates as you like under each tag — one is picked randomly
+#   • For anniversaries without a partner_name, {partner_name} is omitted
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+# ── BIRTHDAY ─────────────────────────────────────────────────────────────────
+
+[birthday]
+Happy Birthday {name}! 🎂 Wishing you a day as wonderful as you are. Hope it's filled with love, laughter, and everything you deserve. Have an amazing one! 🎉
+
+[birthday]
+Many happy returns of the day, {name}! 🎈 May this birthday bring you joy, good health, and all the happiness in the world. Celebrating you today!
+
+[birthday]
+Wishing you a very Happy Birthday, {name}! 🎂 Hope your special day is surrounded by the people you love and all the things that make you smile. Enjoy every moment! ✨
+
+[birthday]
+Happy Birthday {name}! 🥳 Another year older, another year wiser — though you never seem to age! Hope today is as special as you are. Lots of love! 🎁
+
+[birthday]
+Sending you warm birthday wishes, {name}! 🎉 May this new year of your life be your best one yet, filled with wonderful memories and beautiful moments.
+
+[birthday]
+Happy Birthday {name}! 🌟 Birthdays come and go, but the warmth you bring to everyone around you stays forever. Here's to celebrating you today! 🎂
+
+[birthday]
+Hope your birthday is absolutely fabulous, {name}! 🎈 Wishing you great health, lots of happiness, and a year ahead full of exciting adventures. Enjoy your day!
+
+[birthday]
+To a wonderful {relationship} — Happy Birthday {name}! 🎂 Today is all about you, so make it count. Wishing you every happiness today and always. 💐
+
+[birthday]
+Happy Birthday {name}! 🥂 May your day be filled with smiles, surprises, and all your favourite things. Here's to you and many more wonderful years ahead!
+
+[birthday]
+Warmest birthday wishes to you, {name}! 🌸 May the year ahead be full of new beginnings, beautiful moments, and endless blessings. Have a truly special day! 🎉
+
+
+# ── ANNIVERSARY ──────────────────────────────────────────────────────────────
+
+[anniversary]
+Happy Anniversary {name} and {partner_name}! 💕 Wishing you both a day filled with love and beautiful memories. Here's to many more wonderful years together! 🥂
+
+[anniversary]
+Warmest congratulations on your anniversary, {name} and {partner_name}! 🌹 May your love continue to grow stronger with each passing year. You two are truly special together!
+
+[anniversary]
+Happy Anniversary! 💍 Wishing {name} and {partner_name} a lifetime of love, laughter, and happiness. May this day remind you of everything that makes your bond so beautiful. ❤️
+
+[anniversary]
+Congratulations on another beautiful year together, {name} and {partner_name}! 🌷 Your love is an inspiration to everyone around you. Wishing you endless joy and togetherness! 💑
+
+[anniversary]
+Happy Anniversary {name} and {partner_name}! 🎊 May your love story continue to be filled with joy, adventure, and deep affection for years and years to come. Celebrate big today! 🥂
+
+[anniversary]
+Sending lots of love on your anniversary, {name} and {partner_name}! 💞 May each year bring you closer and make your bond even stronger. You two are goals! 🌟
+
+[anniversary]
+Many congratulations on your anniversary! 💐 Wishing {name} and {partner_name} a day as lovely as the love you share. Here's to forever together!
+
+[anniversary]
+Happy Anniversary to a wonderful couple! 🌹 {name} and {partner_name}, may your love keep flourishing and your happiness know no bounds. Celebrating you both today! 💕
+
+
+# ── CUSTOM / GENERAL ─────────────────────────────────────────────────────────
+
+[custom]
+Warmest wishes to you on this special occasion, {name}! 🌟 Hope this day brings you all the joy and happiness you truly deserve. Thinking of you! 💐
+
+[custom]
+Sending you lots of love and warm wishes, {name}! 🎉 May this {occasion_label} be everything you hoped for and more. Celebrate well! ✨
+
+[custom]
+Congratulations and best wishes, {name}! 🥂 Here's to making wonderful memories on this special day. Wishing you all the best always!
+
+[custom]
+Thinking of you on this special occasion, {name}! 🌸 Hope it's a truly wonderful day surrounded by the people you love. Warm wishes always! 💫
+
+[custom]
+Many warm wishes to you, {name}! 🎊 May this {occasion_label} bring you happiness, health, and everything you've been looking forward to. Enjoy every moment! 🌟

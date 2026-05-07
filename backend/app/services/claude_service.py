@@ -286,6 +286,15 @@ async def _try_configured_providers(prompt: str, ai: dict) -> str:
             logger.warning("Fallback: Gemini failed (%s)", e)
             errors.append(f"gemini: {e}")
 
+    # Final fallback: offline wish bank (only when contact/occasion context is available)
+    contact = ai.get("_contact")
+    occasion = ai.get("_occasion")
+    on_date = ai.get("_on_date")
+    if contact and occasion and on_date:
+        logger.warning("All AI providers failed — falling back to offline wish bank")
+        from app.services.wish_bank_service import pick_wish
+        return pick_wish(contact, occasion, on_date)
+
     raise RuntimeError(
         "No AI provider is available. "
         + (f"Tried: {'; '.join(errors)}" if errors else "No API keys are configured.")
@@ -307,6 +316,15 @@ async def _call_provider(prompt: str, ai: dict) -> str:
 
     if provider == "meta_wa":
         return await _generate_meta_wa(prompt, ai["meta_wa_chat_id"], ai.get("_profile_id"))
+
+    if provider == "offline":
+        contact = ai.get("_contact")
+        occasion = ai.get("_occasion")
+        on_date = ai.get("_on_date")
+        if contact and occasion and on_date:
+            from app.services.wish_bank_service import pick_wish
+            return pick_wish(contact, occasion, on_date)
+        raise RuntimeError("offline provider requires contact/occasion context (use generate_message, not call_ai_raw)")
 
     if provider == "local":
         model = await _detect_local_model(ai["local_ai_url"], ai["local_ai_model"])
@@ -448,6 +466,10 @@ async def generate_message(
         ai["_profile_id"] = profile_id
     elif contact and hasattr(contact, "profile_id"):
         ai["_profile_id"] = contact.profile_id
+    # Pass contact/occasion so the offline provider can pick from the wish bank
+    ai["_contact"] = contact
+    ai["_occasion"] = occasion
+    ai["_on_date"] = on_date
     prompt = _build_prompt(contact, occasion, on_date, extra_context=extra_context)
     text = await _call_provider(prompt, ai)
     return text, prompt
