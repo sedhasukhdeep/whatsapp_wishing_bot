@@ -169,7 +169,30 @@ async def restart_bridge_session(profile_id: int) -> dict:
         raise HTTPException(status_code=502, detail=f"WhatsApp bridge error: {e}") from e
 
 
-async def ask_meta_ai(prompt: str, profile_id: int, chat_id: str, timeout_ms: int = 45000) -> str:
+async def find_meta_ai_chat(profile_id: int) -> dict:
+    """Search all WhatsApp chats for the Meta AI contact by name.
+
+    Returns { chatId, name } if found. Raises HTTPException if not found or not connected.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(
+                f"{settings.wa_bridge_url}/find-meta-ai",
+                params={"profileId": profile_id},
+            )
+            if resp.status_code == 503:
+                _503()
+            if resp.status_code == 404:
+                raise HTTPException(status_code=404, detail=resp.json().get("error", "Meta AI chat not found"))
+            resp.raise_for_status()
+            return resp.json()
+    except HTTPException:
+        raise
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"WhatsApp bridge error: {e}") from e
+
+
+async def ask_meta_ai(prompt: str, profile_id: int, chat_id: str, timeout_ms: int = 60000) -> str:
     """Send a prompt to Meta AI's WhatsApp chat and return the response text.
 
     The bridge sends the message and waits for Meta AI's reply (up to timeout_ms).

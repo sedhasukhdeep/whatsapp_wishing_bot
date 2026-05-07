@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2, Eye, EyeOff, RefreshCw } from 'lucide-react';
-import { getAISettings, getAIStatus, getWaChats, updateAISettings, updateProfile } from '../api/client';
+import { findMetaAiChat, getAISettings, getAIStatus, getWaChats, updateAISettings, updateProfile } from '../api/client';
 import type { WaChat } from '../api/client';
 import type { AISettings, AIStatus } from '../types';
 import { useProfile } from '../context/ProfileContext';
@@ -66,6 +66,8 @@ export default function SettingsPage() {
   const [geminiModel, setGeminiModel] = useState('gemini-2.0-flash');
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [metaWaChatId, setMetaWaChatId] = useState('13135550002@c.us');
+  const [metaAiDetecting, setMetaAiDetecting] = useState(false);
+  const [metaAiDetectResult, setMetaAiDetectResult] = useState<string | null>(null);
   const [localAiUrl, setLocalAiUrl] = useState('http://localhost:1234/v1');
   const [localAiModel, setLocalAiModel] = useState('');
 
@@ -99,6 +101,22 @@ export default function SettingsPage() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleDetectMetaAi = async () => {
+    if (!profile) return;
+    setMetaAiDetecting(true);
+    setMetaAiDetectResult(null);
+    try {
+      const result = await findMetaAiChat(profile.id);
+      setMetaWaChatId(result.chatId);
+      setMetaAiDetectResult(`✓ Found: ${result.name} (${result.chatId})`);
+    } catch (e: any) {
+      const msg = e.response?.data?.detail || e.message || 'Detection failed';
+      setMetaAiDetectResult(`✗ ${msg}`);
+    } finally {
+      setMetaAiDetecting(false);
+    }
+  };
 
   const loadWaChats = async () => {
     setWaChatsLoading(true);
@@ -445,18 +463,35 @@ export default function SettingsPage() {
 
           <Field
             label="Meta AI Chat ID"
-            description="WhatsApp chat ID for Meta AI. Find it by opening the Meta AI chat in WhatsApp — it's listed as a contact. Default is the US number 13135550002@c.us."
+            description="WhatsApp chat ID for Meta AI. The number varies by region — use Auto-detect to find the correct one automatically."
           >
-            <Input
-              value={metaWaChatId}
-              onChange={(e) => setMetaWaChatId(e.target.value)}
-              placeholder="13135550002@c.us"
-              className="font-mono text-sm"
-            />
+            <div className="flex gap-2">
+              <Input
+                value={metaWaChatId}
+                onChange={(e) => setMetaWaChatId(e.target.value)}
+                placeholder="13135550002@c.us"
+                className="font-mono text-sm"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleDetectMetaAi}
+                disabled={metaAiDetecting}
+                className="shrink-0"
+              >
+                {metaAiDetecting ? <RefreshCw size={14} className="animate-spin" /> : 'Auto-detect'}
+              </Button>
+            </div>
+            {metaAiDetectResult && (
+              <p className={`text-xs mt-1 ${metaAiDetectResult.startsWith('✓') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                {metaAiDetectResult}
+              </p>
+            )}
           </Field>
           {aiProvider === 'meta_wa' && (
             <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded px-3 py-2">
-              Meta AI via WhatsApp sends your prompts to the Meta AI chat and waits for the reply. WhatsApp must be connected and the Meta AI contact must be available in your region.
+              Meta AI via WhatsApp sends your prompts to the Meta AI chat and waits for the reply. WhatsApp must be connected. Click <strong>Auto-detect</strong> above to find your regional Meta AI number, then save settings.
             </p>
           )}
 

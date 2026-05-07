@@ -17,6 +17,16 @@ const sessions = new Map();
 // Map<profileId, { chatId, callback }> — one-shot listeners for Meta AI replies
 const metaListeners = new Map();
 
+/**
+ * Normalise a WhatsApp ID to its numeric part only for loose comparison.
+ * Strips @c.us / @s.whatsapp.net suffixes and any leading "+".
+ * e.g. "13135550002@c.us" → "13135550002"
+ *      "+13135550002"     → "13135550002"
+ */
+function _normalizeWaId(id) {
+  return (id || '').split('@')[0].replace(/^\+/, '');
+}
+
 async function _forwardToWebhook(msg, profileId) {
   if (!BACKEND_URL) return;
   const chatId = msg.id.remote;
@@ -106,12 +116,20 @@ function _createSession(profileId) {
 
   client.on('message', (msg) => {
     const fromId = msg.id.remote;
-    // Check if there's a pending Meta AI request for this profile + chat
+    // Check if there's a pending Meta AI request for this profile + chat.
+    // Use normalised comparison so format differences (@c.us, leading +) don't break matching.
     const listener = metaListeners.get(profileId);
-    if (listener && fromId === listener.chatId) {
-      metaListeners.delete(profileId);
-      listener.callback(msg.body);
-      return; // Don't forward to webhook — this is a Meta AI response
+    if (listener) {
+      const listenerNorm = _normalizeWaId(listener.chatId);
+      const remoteNorm   = _normalizeWaId(fromId);
+      const fromNorm     = _normalizeWaId(msg.from);
+      if (listenerNorm && (remoteNorm === listenerNorm || fromNorm === listenerNorm)) {
+        metaListeners.delete(profileId);
+        const text = msg.body || msg._data?.body || '';
+        console.log(`[WA:${profileId}] Meta AI response received from ${fromId}: ${text.slice(0, 80)}`);
+        listener.callback(text);
+        return; // Don't forward to webhook — this is a Meta AI response
+      }
     }
     _forwardToWebhook(msg, profileId);
   });
@@ -230,6 +248,26 @@ async function sendMessageRaw(profileId, chatId, message) {
 }
 
 /**
+ * Search all chats for the Meta AI contact by name.
+ * Returns { chatId, name } if found, or null.
+ * Useful for auto-detecting the correct regional Meta AI number.
+ */
+async function findMetaAiChat(profileId) {
+  const s = sessions.get(profileId);
+  if (!s || !s.isReady) throw new Error('Client not ready');
+  const chats = await s.client.getChats();
+  // Meta AI chat names vary: "Meta AI", "Meta Ai", "AI" (some regions)
+  const META_AI_NAMES = ['meta ai', 'meta-ai', 'metaai'];
+  for (const chat of chats) {
+    const nameLower = (chat.name || '').toLowerCase().trim();
+    if (META_AI_NAMES.some((n) => nameLower === n) || nameLower.includes('meta ai')) {
+      return { chatId: chat.id._serialized, name: chat.name };
+    }
+  }
+  return null;
+}
+
+/**
  * Register a one-shot listener that resolves when the next message arrives
  * from `chatId` in the given profile's session.
  */
@@ -257,4 +295,5 @@ module.exports = {
   getChatById,
   registerMetaListener,
   unregisterMetaListener,
+  findMetaAiChat,
 };

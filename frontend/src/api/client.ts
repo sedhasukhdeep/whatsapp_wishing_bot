@@ -227,6 +227,9 @@ export const updateAISettings = (data: AISettingsUpdate) =>
 export const getAIStatus = () =>
   api.get<AIStatus>('/api/admin/ai-status').then((r) => r.data);
 
+export const findMetaAiChat = (profileId: number) =>
+  api.get<{ chatId: string; name: string }>('/api/admin/find-meta-ai-chat', { params: { profile_id: profileId } }).then((r) => r.data);
+
 // Giphy proxy
 export const searchGifs = (q: string) =>
   api.get<{ data: GiphyResult[] }>('/api/giphy/search', { params: { q } }).then((r) => r.data);

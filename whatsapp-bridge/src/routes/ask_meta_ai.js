@@ -8,12 +8,35 @@
  * Response: { text: string }
  */
 const { Router } = require('express');
-const { getStatus, sendMessageRaw, registerMetaListener, unregisterMetaListener } = require('../sessions');
+const { getStatus, sendMessageRaw, registerMetaListener, unregisterMetaListener, findMetaAiChat } = require('../sessions');
 
 const router = Router();
 
+/**
+ * GET /find-meta-ai?profileId=1
+ *
+ * Search all chats for the Meta AI contact by name.
+ * Returns { chatId, name } if found, or 404.
+ * Use this to auto-detect the correct regional Meta AI chat ID.
+ */
+router.get('/find-meta-ai', async (req, res) => {
+  const profileId = parseInt(req.query.profileId, 10);
+  if (!profileId) return res.status(400).json({ error: 'profileId is required' });
+
+  const { ready } = getStatus(profileId);
+  if (!ready) return res.status(503).json({ error: 'WhatsApp not connected — scan QR code first' });
+
+  try {
+    const result = await findMetaAiChat(profileId);
+    if (!result) return res.status(404).json({ error: 'Meta AI chat not found. Make sure you have started a conversation with Meta AI in WhatsApp.' });
+    return res.json(result);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/ask-meta-ai', async (req, res) => {
-  const { profile_id, chat_id, prompt, timeout_ms = 45000 } = req.body;
+  const { profile_id, chat_id, prompt, timeout_ms = 60000 } = req.body;
 
   if (!profile_id) return res.status(400).json({ error: 'profile_id is required' });
   if (!chat_id)    return res.status(400).json({ error: 'chat_id is required' });

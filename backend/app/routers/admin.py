@@ -110,6 +110,16 @@ async def ai_status(db: Session = Depends(get_db)):
     return await get_ai_status(db)
 
 
+@router.get("/find-meta-ai-chat")
+async def find_meta_ai_chat_endpoint(profile_id: int):
+    """Search the connected WhatsApp session for the Meta AI chat and return its chat ID.
+
+    Use this to auto-detect the correct regional Meta AI number.
+    """
+    from app.services.whatsapp_service import find_meta_ai_chat
+    return await find_meta_ai_chat(profile_id)
+
+
 @router.post("/wa-webhook")
 async def wa_webhook(body: WAWebhookPayload, db: Session = Depends(get_db)):
     from app.models.profile import Profile
